@@ -20,7 +20,7 @@ export class MapService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private jobsService: JobsService,
-  ) { }
+  ) {}
 
   async readExcelFile(filePath: string): Promise<any[]> {
     const workbook = xlsx.readFile(filePath);
@@ -41,7 +41,7 @@ export class MapService {
     const IMMEDIATE_ROWS_TO_PROCESS =
       this.configService.get<number>('IMMEDIATE_ROWS_TO_PROCESS') || 10000;
 
-    console.log('body', data);
+    //console.log('body', data);
     // save mapping data to database
     const mappingData = await this.prisma.mappingData.create({
       data: {
@@ -98,8 +98,8 @@ export class MapService {
   async fetchContacts(page: number, pageSize: number) {
     const skip = (page - 1) * pageSize;
 
-    const contactdata = await this.prisma.contact.findMany({})
-    console.log("contact data ==>", contactdata)
+    const contactdata = await this.prisma.contact.findMany({});
+    console.log('contact data ==>', contactdata);
     const contacts = await this.prisma.contact.findMany({
       skip,
       take: Number(pageSize),
@@ -112,10 +112,8 @@ export class MapService {
 
     return {
       contacts: JSON.parse(
-        JSON.stringify(
-          contacts,
-          (key, value) =>
-            typeof value === 'bigint' ? value.toString() : value,
+        JSON.stringify(contacts, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value,
         ),
       ),
       contactCount: contacts.length,
@@ -129,10 +127,8 @@ export class MapService {
     const contactListData = await this.prisma.contact.findMany();
     return {
       contacts: JSON.parse(
-        JSON.stringify(
-          contactListData,
-          (key, value) =>
-            typeof value === 'bigint' ? value.toString() : value,
+        JSON.stringify(contactListData, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value,
         ),
       ),
     };
@@ -155,14 +151,12 @@ export class MapService {
     try {
       const deletedResponse = await this.prisma.mappingData.delete({
         where: {
-          id: Number(Id)
-        }
-      })
-      return { deletedResponse, message: "Iteam Deleted Successfully" }
-
+          id: Number(Id),
+        },
+      });
+      return { deletedResponse, message: 'Iteam Deleted Successfully' };
     } catch (error) {
-      return { message: "Have Problem for deletion", error: error.message }
-
+      return { message: 'Have Problem for deletion', error: error.message };
     }
   }
 
@@ -170,15 +164,14 @@ export class MapService {
     try {
       const mapFieldDataById = await this.prisma.mappingData.findUnique({
         where: {
-          id: Number(Id)
-        }
+          id: Number(Id),
+        },
       });
       const tableData: TableData[] = JSON.parse(mapFieldDataById.mapping);
-      const mappedData = tableData.filter(item => item.mapped === "Mapped");
-      return { mapFiledData: mapFieldDataById, tableMappedData: mappedData }
-
+      const mappedData = tableData.filter((item) => item.mapped === 'Mapped');
+      return { mapFiledData: mapFieldDataById, tableMappedData: mappedData };
     } catch (error) {
-      return { message: "Facing Problem To Fetch Data", error: error.message }
+      return { message: 'Facing Problem To Fetch Data', error: error.message };
     }
   }
 
@@ -194,15 +187,15 @@ export class MapService {
       }
 
       return randomWord;
-    }
+    };
 
-    // clone by id 
+    // clone by id
     try {
       const userToCopy = await this.prisma.mappingData.findUnique({
-        where: { id: Number(Id) }
+        where: { id: Number(Id) },
       });
 
-      const MapName = `${userToCopy.name}__${generateRandomWord()}`
+      const MapName = `${userToCopy.name}__${generateRandomWord()}`;
       const createClone = await this.prisma.mappingData.create({
         data: {
           name: MapName,
@@ -214,48 +207,46 @@ export class MapService {
           ...{
             created_at: new Date(),
             isDeleted: false,
-          }
-        }
-
-      })
-      return { cloneData: createClone, message: "clone created successfully" }
+          },
+        },
+      });
+      return { cloneData: createClone, message: 'clone created successfully' };
     } catch (error) {
-      return { message: "Facing Problem To Fetch Data", error: error.message }
+      return { message: 'Facing Problem To Fetch Data', error: error.message };
     }
   }
 
   async updateMapDataById(Id: any, Data: any) {
-    console.log(`Id : ${Id}, Data : ${Data}`)
+    console.log(`Id : ${Id}, Data : ${Data}`);
     // Check if the map data exists
     const existingMap = await this.prisma.mappingData.findUnique({
       where: { id: Number(Id) },
     });
 
     if (!existingMap) {
-      return { message: `Map with ID ${Id} not found.` }
-
+      return { message: `Map with ID ${Id} not found.` };
     }
     // Update the map data
-    try{
-    const updatedMap = await this.prisma.mappingData.update({
-      where: { id: Number(Id) },
-      data: {
-        name: Data.name,
-        mainTable: Data.mainTable,
-        mapping: Data.mapping,
-        filePath: Data.filePath,
-        status: Data.status,
-        action: Data.action,
-        ...{
-          updated_at: new Date(),
-          isDeleted: false,
-        }
-      }
-    });
-    const countExcelRows = (await this.readExcelFile(Data.filePath)).length;
-    // IMMEDIATE_ROWS_TO_PROCESS
-    const IMMEDIATE_ROWS_TO_PROCESS =
-      this.configService.get<number>('IMMEDIATE_ROWS_TO_PROCESS') || 10000;
+    try {
+      const updatedMap = await this.prisma.mappingData.update({
+        where: { id: Number(Id) },
+        data: {
+          name: Data.name,
+          mainTable: Data.mainTable,
+          mapping: Data.mapping,
+          filePath: Data.filePath,
+          status: Data.status,
+          action: Data.action,
+          ...{
+            updated_at: new Date(),
+            isDeleted: false,
+          },
+        },
+      });
+      const countExcelRows = (await this.readExcelFile(Data.filePath)).length;
+      // IMMEDIATE_ROWS_TO_PROCESS
+      const IMMEDIATE_ROWS_TO_PROCESS =
+        this.configService.get<number>('IMMEDIATE_ROWS_TO_PROCESS') || 10000;
       if (countExcelRows > IMMEDIATE_ROWS_TO_PROCESS) {
         await this.jobsService.sendDataToJob({
           mapId: updatedMap.id,
@@ -267,12 +258,10 @@ export class MapService {
       const mapStatus = await this.jobsService.ProcessContactRowsImmediately(
         updatedMap.id,
       );
-    return updatedMap;
-  }catch(error){
-    console.log(error);
-    return { message: "Facing Problem To Update Data", error: error.message }
-  }
+      return updatedMap;
+    } catch (error) {
+      console.log(error);
+      return { message: 'Facing Problem To Update Data', error: error.message };
+    }
   }
 }
-
-

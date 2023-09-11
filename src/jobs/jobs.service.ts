@@ -8,6 +8,9 @@ import { MailService } from 'src/mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import { Console } from 'console';
 import { Prisma } from '@prisma/client';
+import axios from 'axios';
+import { stat } from 'fs';
+
 @Injectable()
 export class JobsService {
   constructor(
@@ -15,7 +18,7 @@ export class JobsService {
     private excelService: ExcelService,
     private mailService: MailService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * This function will save jobs to database
@@ -33,9 +36,13 @@ export class JobsService {
   async ProcessContactRowsImmediately(mapId: number): Promise<{
     errorCode: 'ERROR' | 'NO_ERROR' | 'PROCESSING_FAILED';
     message: string;
+    created: any;
+    updated: any;
+    TotalRecords: any;
   }> {
     try {
       console.log('mapId', mapId);
+      console.log(`Total number of rows:`);
       const map = await this.prisma.mappingData.update({
         where: {
           id: mapId,
@@ -44,7 +51,10 @@ export class JobsService {
           status: 'PROCESSING',
         },
       });
-      console.log('map', map.mapping);
+      let created = 0;
+      let updated = 0;
+
+      //console.log('map', map.mapping);
       const accountsFields = JSON.parse(map.mapping).filter(
         (a) => a.table.toLowerCase() === 'accounts' && a.mapped === 'Mapped',
       );
@@ -52,168 +62,292 @@ export class JobsService {
         (a) => a.table.toLowerCase() === 'contacts' && a.mapped === 'Mapped',
       );
 
-      console.log('accountsFields', accountsFields, contactsFields);
+      //  console.log('accountsFields', accountsFields, contactsFields);
       const readExcelFile = await this.excelService.readExcelFile(map.filePath);
-      console.log('readExcelFile', {
-        accountsFields,
-        contactsFields,
-      });
+      // console.log('readExcelFile', {
+      //   accountsFields,
+      //   contactsFields,
+      // });
 
-      readExcelFile.map(async (row) => {
-        // check source table
-        const accountsData = {};
-        accountsFields.map((field) => {
-          const cleanedcolumName = field.columnName.replace(
-            /\s+\(required\)$/,
-            '',
-          );
-          // NumberOfEmployees
-          accountsData[
-            cleanedcolumName.charAt(0).toUpperCase() +
-            cleanedcolumName.slice(1).trim()
-          ] = row[field.excelHeader];
-        });
-        //
-        const contactsData: any = {};
-        contactsFields.map((field) => {
-          // console.log(
-          //   'field-------------------------------------------------->',
-          //   field,
-          // );
-          const cleanedcolumName = field.columnName.replace(
-            /\s+\(required\)$/,
-            '',
-          );
-          contactsData[
-            cleanedcolumName.charAt(0).toUpperCase() +
-            cleanedcolumName.slice(1).trim()
-          ] = ['IsWarm__c'].includes(
-            cleanedcolumName.charAt(0).toUpperCase() +
-            cleanedcolumName.slice(1).trim(),
-          )
+      const totalRows = readExcelFile.length;
+      let TotalRecords = 0;
+      //readExcelFile.map(async (row) => {
+      await Promise.all(
+        readExcelFile.map(async (row) => {
+          // check source table
+          const accountsData = {};
+          accountsFields.map((field) => {
+            const cleanedcolumName = field.columnName.replace(
+              /\s+\(required\)$/,
+              '',
+            );
+            // NumberOfEmployees
+            accountsData[
+              cleanedcolumName.charAt(0).toUpperCase() +
+                cleanedcolumName.slice(1).trim()
+            ] = row[field.excelHeader];
+          });
+          //
+          const contactsData: any = {};
+          contactsFields.map((field) => {
+            // console.log(
+            //   'field-------------------------------------------------->',
+            //   field,
+            // );
+            const cleanedcolumName = field.columnName.replace(
+              /\s+\(required\)$/,
+              '',
+            );
+            contactsData[
+              cleanedcolumName.charAt(0).toUpperCase() +
+                cleanedcolumName.slice(1).trim()
+            ] = ['IsWarm__c'].includes(
+              cleanedcolumName.charAt(0).toUpperCase() +
+                cleanedcolumName.slice(1).trim(),
+            )
               ? row[field.excelHeader] === 0
                 ? false
                 : true
               : row[field.excelHeader];
-        });
-        console.log("map.action line 119 ==>", map.action)
-        if (map.action === 'Insert Only' || map.action === 'Insert') {
-          contactsData.insert_map_history_id = map.id;
+          });
+          console.log('map.action line 119 ==>', map.action);
 
-          /**
-           * check if source table is account
-           * TODO @Bhagirath: Map Fields
-           */
-          try {
-            const createContact = await this.prisma.contact.create({
-              data: {
-                ...contactsData,
-                Account: {
-                  connectOrCreate: {
-                    where: {
-                      Name: accountsData['Name'],
+          if (map.action === 'Insert Only' || map.action === 'Insert') {
+            contactsData.insert_map_history_id = map.id;
+
+            /**
+             * check if source table is account
+             * TODO @Bhagirath: Map Fields
+             */
+            try {
+              console.log('Try INside');
+              //  console.log(' contactsData:', contactsData);
+              // console.log('getContactsWithoutRank:');
+
+              const createContact = await this.prisma.contact.create({
+                data: {
+                  ...contactsData,
+                  Account: {
+                    connectOrCreate: {
+                      where: {
+                        Name: accountsData['Name'],
+                      },
+                      create: {
+                        ...accountsData,
+                      },
                     },
-                    create: {
+                  },
+                },
+              });
+              created++;
+              //  console.log('createContact->', createContact);
+            } catch (error) {
+              console.log('Error occurred for contactsData:', error);
+              console.log('Error occurred for accountsData:', accountsData);
+
+              const emailBody = {
+                transactional_message_id: 96,
+                to: 'bhagirathsingh@keenagile.com',
+                from: 'support@itadusa.com',
+                subject: 'Contact Import Summary',
+                identifiers: {
+                  email: 'bhagirathsingh@keenagile.com',
+                },
+                message_data: {
+                  total_records: TotalRecords,
+                  inserted_records: created,
+                  updated_records: updated,
+                  exist_records: '100',
+                  header_content: `Import process has been failed, and we found this error: ${error.message}`,
+                },
+              };
+
+              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
+              //   (await this.mailService.sendUserConfirmation(
+              //     emailBody,
+              //     'Contact Upload Completed',
+              //   ));
+
+              if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === 'P2002') {
+                  // Handle the unique constraint violation error here
+                  console.error(
+                    'Unique constraint violation:',
+                    error.meta.target,
+                  );
+                }
+              }
+              return;
+            }
+          }
+          if (map.action === 'Update' || map.action === 'Insert And Update') {
+            try {
+              console.log('contactsData', contactsData);
+
+              const upsertResult = await this.prisma.contact.upsert({
+                where: {
+                  contactIdentifier: {
+                    Email: contactsData['Email'], // Replace with the actual field names
+                    LastName: contactsData['LastName'], // Replace with the actual field names
+                    FirstName: contactsData['FirstName'], // Replace with the actual field names
+                  },
+                },
+                update: {
+                  ...contactsData,
+                  Account: {
+                    // Update the related Account data
+                    update: {
                       ...accountsData,
                     },
                   },
                 },
-              },
-            });
-            // console.log('createContact', createContact);
-          } catch (error) {
-            console.log('Error occurred for contactsData:', contactsData);
-            console.log('Error occurred for accountsData:', accountsData);
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-              if (error.code === 'P2002') {
-                // Handle the unique constraint violation error here
-                console.error(
-                  'Unique constraint violation:',
-                  error.meta.target,
-                );
-              }
-            }
-          }
-        }
-        if (map.action === 'Update' || map.action === 'Insert And Update') {
-          try {
-            console.log('contactsData', contactsData);
-            await this.prisma.contact.upsert({
-              where: {
-                contactIdentifier: {
-                  Email: contactsData['Email'], // Replace with the actual field names
-                  LastName: contactsData['LastName'], // Replace with the actual field names
-                  FirstName: contactsData['FirstName'], // Replace with the actual field names
-                },
-              },
-              update: {
-                ...contactsData,
-                Account: {
-                  // Update the related Account data
-                  update: {
-                    ...accountsData,
-                  },
-                },
-              },
-              create: {
-                ...contactsData,
-                Account: {
-                  connectOrCreate: {
-                    where: {
-                      Name: accountsData['Name'],
+                create: {
+                  ...contactsData,
+                  Account: {
+                    connectOrCreate: {
+                      where: {
+                        Name: accountsData['Name'],
+                      },
+                      create: {
+                        ...accountsData,
+                      },
                     },
-                    create: {
-                      ...accountsData,
-                    }, 
                   },
                 },
-              },
-            });
-          } catch (error) {
-            console.log('Error occurred for contactsData:', contactsData);
-            console.log('Error occurred for accountsData:', accountsData);
-            console.error('Unique constraint violation:', error);
-            if (error instanceof Prisma.PrismaClientKnownRequestError) {
-              if (error.code === 'P2002') {
-                // Handle the unique constraint violation error here
-                console.error(
-                  'Unique constraint violation:',
-                  error.meta.target,
-                );
+              });
+
+              if (upsertResult.id !== undefined) {
+                created++; // If 'id' is present, a new record was created
+              } else if (upsertResult.updated_at !== undefined) {
+                updated++; // If 'updated_at' is present, an existing record was updated
               }
+            } catch (error) {
+              console.log('Error occurred for contactsData:', contactsData);
+              console.log('Error occurred for accountsData:', accountsData);
+              console.error('Unique constraint violation:', error);
+              /**
+               * Email code start from here
+               */
+
+              const emailBody = {
+                transactional_message_id: 96,
+                to: 'bhagirathsingh@keenagile.com',
+                from: 'support@itadusa.com',
+                subject: 'Contact Import Summary',
+                identifiers: {
+                  email: 'bhagirathsingh@keenagile.com',
+                },
+                message_data: {
+                  total_records: TotalRecords,
+                  inserted_records: created,
+                  updated_records: updated,
+                  exist_records: '100',
+                  header_content: `Import process has been failed, and we found this error: ${error.message}`,
+                },
+              };
+
+              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
+              //   (await this.mailService.sendUserConfirmation(
+              //     emailBody,
+              //     'Contact Upload Completed',
+              //   ));
+
+              if (error instanceof Prisma.PrismaClientKnownRequestError) {
+                if (error.code === 'P2002') {
+                  // Handle the unique constraint violation error here
+                  console.error(
+                    'Unique constraint violation:',
+                    error.meta.target,
+                  );
+                }
+              }
+              return;
             }
           }
-        }
-      });
+          TotalRecords++;
+        }),
+      );
+      console.log('TotalRecords-----', TotalRecords);
+      return {
+        errorCode: 'NO_ERROR',
+        message: 'Data Uploaded Successfully!',
+        created: created,
+        updated: updated,
+        TotalRecords: totalRows,
+      };
     } catch (err) {
       console.log('errorCode' + err);
-      return { errorCode: 'ERROR', message: 'Something went wrong' };
+      return {
+        errorCode: 'ERROR',
+        message: 'Something went wrong',
+        created: 0,
+        updated: 0,
+        TotalRecords: 0,
+      };
     }
   }
 
-  @Cron('45 * * * * *')
+  @Cron('0 * * * * *')
   async handleCron() {
+    console.log('cron job started');
     const allQueuedJobs = await this.prisma.jobs.findMany({
       where: {
-        status: 'uploaded',
+        status: 'PENDING',
       },
     });
+    // Check if there are no queued jobs
+    if (allQueuedJobs.length === 0) {
+      console.log('No queued jobs found.');
+      return;
+    }
     allQueuedJobs.map(async (job) => {
       const status = await this.ProcessContactRowsImmediately(job.mapId);
+      console.log('status--', status);
       if (status.errorCode === 'NO_ERROR') {
+        const emailBody = {
+          transactional_message_id: 96,
+          to: 'bhagirathsingh@keenagile.com',
+          from: 'support@itadusa.com',
+          subject: 'Contact Import Summary',
+          identifiers: {
+            email: 'bhagirathsingh@keenagile.com',
+          },
+          message_data: {
+            total_records: status.TotalRecords,
+            inserted_records: status.created,
+            updated_records: status.updated,
+            exist_records: '100',
+            header_content:
+              'Your Contact Data Import process has been completed, please check the details below: ',
+          },
+          disable_message_retention: false,
+          send_to_unsubscribed: true,
+          tracked: true,
+          queue_draft: false,
+          disable_css_preprocessing: true,
+        };
+
         this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
           (await this.mailService.sendUserConfirmation(
-            {
-              name: 'Bhagirath',
-              email: 'twiiter@gmail.com',
-            },
+            emailBody,
             'Contact Upload Completed',
           ));
+        console.log('Email Sent ');
+      }
+      if (status.errorCode === 'NO_ERROR') {
+        const updateJobStatus = await this.prisma.jobs.update({
+          where: {
+            id: job.id,
+          },
+          data: {
+            status: 'Complete',
+          },
+        });
       }
     });
   }
 
-  @Cron('0 0 0 * * *')
+  // @Cron('0 0 0 * * *')
   async handleScoreCron() {
     await this.createRankOnTitle();
     //
@@ -229,7 +363,7 @@ export class JobsService {
       const title = contact.Title;
       const joiningDate = contact.created_at;
       const titleScore = await this.matchCriteriaRules(title, joiningDate);
-     // console.log('titleScore', titleScore);
+      // console.log('titleScore', titleScore);
       await this.prisma.contact.update({
         where: {
           id: contact.id,
@@ -366,28 +500,29 @@ export class JobsService {
        */
       if (index === criteria.length - 1) {
         // last index
-        if ((matchedScore.includes('titleset1') &&
-          matchedScore.includes('titleset2')) ||
-          matchedScore.includes('titleset3')) {
+        if (
+          (matchedScore.includes('titleset1') &&
+            matchedScore.includes('titleset2')) ||
+          matchedScore.includes('titleset3')
+        ) {
           //  console.log(matchedScore);
           score = score + 75;
-        }
-        else if (
+        } else if (
           matchedScore.includes('titleset2') &&
           matchedScore.includes('titleset4')
         ) {
           score = score + 56.25;
-        }
-        else if (matchedScore.includes('titleset1') ||
-          matchedScore.includes('titleset2')) {
+        } else if (
+          matchedScore.includes('titleset1') ||
+          matchedScore.includes('titleset2')
+        ) {
           score = score + 18.75;
         }
         const getJoinedTime = this.getDuration(joiningDate, new Date());
-        console.log('getJoinedTime',joiningDate);
+        console.log('getJoinedTime', joiningDate);
         if (getJoinedTime <= 365) {
           score = score + 20;
-        }
-        else if (getJoinedTime > 365 && getJoinedTime < 365 * 2) {
+        } else if (getJoinedTime > 365 && getJoinedTime < 365 * 2) {
           score = score + 12.5;
         }
       }
@@ -402,8 +537,17 @@ export class JobsService {
    * @returns boolean
    */
   titleset2(str: string) {
-    return ['data center', 'datacenter', 'it', 'technology', 'storage',
-      'infrastructure', 'computer', 'asset', 'help desk'].includes(str);
+    return [
+      'data center',
+      'datacenter',
+      'it',
+      'technology',
+      'storage',
+      'infrastructure',
+      'computer',
+      'asset',
+      'help desk',
+    ].includes(str);
   }
   /**
    * Match Title based on criteria
@@ -412,10 +556,26 @@ export class JobsService {
    * @returns boolean
    */
   titleset1(str: string) {
-    return ['Manager', 'mgr', 'director', 'vp', 'vice president', 'chief', 'cio', 'cto', 'chief information officer', 'chief technology officer'].includes(str);
+    return [
+      'Manager',
+      'mgr',
+      'director',
+      'vp',
+      'vice president',
+      'chief',
+      'cio',
+      'cto',
+      'chief information officer',
+      'chief technology officer',
+    ].includes(str);
   }
   titleset3(str: string) {
-    return ['cio', 'cto', 'chief information officer', 'chief technology officer'].includes(str);
+    return [
+      'cio',
+      'cto',
+      'chief information officer',
+      'chief technology officer',
+    ].includes(str);
   }
   /**
    * Match Post based on criteria
@@ -424,7 +584,9 @@ export class JobsService {
    * @returns boolean
    */
   titleset4(str: string) {
-    return ['senior', 'lead', 'admin', 'supervisor', 'coordinator',].includes(str);
+    return ['senior', 'lead', 'admin', 'supervisor', 'coordinator'].includes(
+      str,
+    );
   }
 
   getDuration(d1: string | Date, d2: string | Date) {
@@ -460,12 +622,14 @@ export class JobsService {
           },
         },
       },
-      orderBy: [{
-        RingLead_Score__c: 'desc',
-      },
-      {
-        FirstName: 'asc',
-      },],
+      orderBy: [
+        {
+          RingLead_Score__c: 'desc',
+        },
+        {
+          FirstName: 'asc',
+        },
+      ],
     });
     console.log('allContacts :>> ', filter);
     let allContactsData = {};
