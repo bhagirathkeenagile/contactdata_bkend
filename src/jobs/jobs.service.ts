@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Get, Res } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateJobDto } from './dtos/create-job.dto';
 import { Jobs } from '@prisma/client';
@@ -10,6 +10,8 @@ import { Console } from 'console';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { stat } from 'fs';
+import { createObjectCsvWriter } from 'csv-writer';
+import * as fs from 'fs';
 
 @Injectable()
 export class JobsService {
@@ -39,6 +41,7 @@ export class JobsService {
     created: any;
     updated: any;
     TotalRecords: any;
+    OutputValue: any;
   }> {
     try {
       console.log('mapId', mapId);
@@ -53,6 +56,10 @@ export class JobsService {
       });
       let created = 0;
       let updated = 0;
+      const errorAccountsData = [];
+      const errorContactsData = [];
+      const SuccessContactsData = [];
+      const OutputData = [];
 
       //console.log('map', map.mapping);
       const accountsFields = JSON.parse(map.mapping).filter(
@@ -139,34 +146,23 @@ export class JobsService {
                   },
                 },
               });
+              SuccessContactsData.push(contactsData);
               created++;
               //  console.log('createContact->', createContact);
             } catch (error) {
               console.log('Error occurred for contactsData:', error);
               console.log('Error occurred for accountsData:', accountsData);
+              errorAccountsData.push(accountsData);
+              errorContactsData.push(contactsData);
 
-              const emailBody = {
-                transactional_message_id: 96,
-                to: 'bhagirathsingh@keenagile.com',
-                from: 'support@itadusa.com',
-                subject: 'Contact Import Summary',
-                identifiers: {
-                  email: 'bhagirathsingh@keenagile.com',
-                },
-                message_data: {
-                  total_records: TotalRecords,
-                  inserted_records: created,
-                  updated_records: updated,
-                  exist_records: '100',
-                  header_content: `Import process has been failed, and we found this error: ${error.message}`,
-                },
-              };
+              // errorContactsData.push(...errorAccountsData);
 
-              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
-              //   (await this.mailService.sendUserConfirmation(
-              //     emailBody,
-              //     'Contact Upload Completed',
-              //   ));
+              console.log('errorContactsData--', errorContactsData);
+
+              const currentDate = new Date().toISOString().replace(/:/g, '-');
+              const fileName = `uploads/Error_${currentDate}_map_${map.name}.csv`;
+              OutputData['error_url'] = `jobs/${fileName}`;
+              this.writeDataToCsv(errorContactsData, fileName);
 
               if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
@@ -177,7 +173,13 @@ export class JobsService {
                   );
                 }
               }
-              return;
+              // return {
+              //   errorCode: 'ERROR',
+              //   message: 'Upload Failed',
+              //   created: created,
+              //   updated: updated,
+              //   TotalRecords: totalRows,
+              // };
             }
           }
           if (map.action === 'Update' || map.action === 'Insert And Update') {
@@ -215,42 +217,22 @@ export class JobsService {
                   },
                 },
               });
-
+              SuccessContactsData.push(contactsData);
               if (upsertResult.id !== undefined) {
-                created++; // If 'id' is present, a new record was created
+                //  created++; // If 'id' is present, a new record was created
               } else if (upsertResult.updated_at !== undefined) {
                 updated++; // If 'updated_at' is present, an existing record was updated
               }
+              updated++;
             } catch (error) {
               console.log('Error occurred for contactsData:', contactsData);
               console.log('Error occurred for accountsData:', accountsData);
               console.error('Unique constraint violation:', error);
+              errorAccountsData.push(accountsData);
+              errorContactsData.push(contactsData);
               /**
                * Email code start from here
                */
-
-              const emailBody = {
-                transactional_message_id: 96,
-                to: 'bhagirathsingh@keenagile.com',
-                from: 'support@itadusa.com',
-                subject: 'Contact Import Summary',
-                identifiers: {
-                  email: 'bhagirathsingh@keenagile.com',
-                },
-                message_data: {
-                  total_records: TotalRecords,
-                  inserted_records: created,
-                  updated_records: updated,
-                  exist_records: '100',
-                  header_content: `Import process has been failed, and we found this error: ${error.message}`,
-                },
-              };
-
-              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
-              //   (await this.mailService.sendUserConfirmation(
-              //     emailBody,
-              //     'Contact Upload Completed',
-              //   ));
 
               if (error instanceof Prisma.PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
@@ -261,35 +243,94 @@ export class JobsService {
                   );
                 }
               }
-              return;
+              return {
+                errorCode: 'ERROR',
+                message: 'Upload Failed',
+                created: created,
+                updated: updated,
+                TotalRecords: totalRows,
+                OutputValue: null,
+              };
             }
           }
           TotalRecords++;
         }),
       );
-      console.log('TotalRecords-----', TotalRecords);
+      // console.log('errorAccountsData--', errorAccountsData);
+
+      // errorContactsData.push(...errorAccountsData);
+
+      console.log('errorContactsData--', errorContactsData);
+
+      const currentDate = new Date().toISOString().replace(/:/g, '-');
+      const fileName = `uploads/Error_${currentDate}_map_${map.name}.csv`;
+      const SuccessFileName = `uploads/Success_${currentDate}_map_${map.name}.csv`;
+      OutputData['error_url'] = `jobs/${fileName}`;
+      OutputData['success_url'] = `jobs/${SuccessFileName}`;
+
+      this.writeDataToCsv(errorContactsData, fileName);
+      this.writeDataToCsv(SuccessContactsData, SuccessFileName);
+
       return {
         errorCode: 'NO_ERROR',
         message: 'Data Uploaded Successfully!',
         created: created,
         updated: updated,
         TotalRecords: totalRows,
+        OutputValue: OutputData,
       };
     } catch (err) {
       console.log('errorCode' + err);
+
+      const emailBody = {
+        transactional_message_id: 96,
+        to: 'bhagirathsingh@keenagile.com',
+        from: 'support@itadusa.com',
+        subject: 'Contact Import Summary',
+        identifiers: {
+          email: 'bhagirathsingh@keenagile.com',
+        },
+        message_data: {
+          total_records: 0,
+          inserted_records: 0,
+          updated_records: 0,
+          exist_records: '100',
+          header_content: `Import process has been failed, and we found this error: ${err.message}`,
+        },
+      };
+
+      this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
+        (await this.mailService.sendUserConfirmation(
+          emailBody,
+          'Contact Upload Completed',
+        ));
+
       return {
         errorCode: 'ERROR',
         message: 'Something went wrong',
         created: 0,
         updated: 0,
         TotalRecords: 0,
+        OutputValue: null,
       };
     }
+  }
+
+  @Get()
+  async writeDataToCsv(data: any[], filePath: string) {
+    const header = Object.keys(data[0]);
+    const csvWriter = createObjectCsvWriter({
+      path: filePath,
+      header: header,
+    });
+
+    await csvWriter.writeRecords(data);
   }
 
   @Cron('0 * * * * *')
   async handleCron() {
     console.log('cron job started');
+    console.log('URL----', process.env.APP_URL);
     const allQueuedJobs = await this.prisma.jobs.findMany({
       where: {
         status: 'PENDING',

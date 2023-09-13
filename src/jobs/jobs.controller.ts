@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Res,Headers, StreamableFile, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Res,
+  Headers,
+  StreamableFile,
+  Body,
+  Param,
+} from '@nestjs/common';
+
 import { JobsService } from './jobs.service';
 import * as fs from 'fs';
 import { join } from 'path';
@@ -16,7 +26,7 @@ export class JobsController {
 
   @Post('rankings')
   async mmmtj(
-    @Body() requestData: any, 
+    @Body() requestData: any,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const { employeePercentageRequest, minimumCount, filterval } = requestData;
@@ -29,7 +39,10 @@ export class JobsController {
     const file = fs.createReadStream(join(process.cwd(), 'uploads', data));
     const fileStats = fs.statSync(file.path);
     res.setHeader('Content-Length', fileStats.size);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', `attachment; filename=${data}`);
     const fileStream = fs.createReadStream(file.path);
     return new StreamableFile(fileStream);
@@ -37,11 +50,16 @@ export class JobsController {
 
   @Get('updateScore')
   async score() {
-    return await this.jobsService.createRankOnTitle(); 
+    return await this.jobsService.createRankOnTitle();
   }
 
   @Post('score')
   async scorePost(@Auth() auth: string) {
     return auth;
+  }
+
+  @Get('uploads/:fileName')
+  async downloadFile(@Param('fileName') fileName, @Res() res) {
+    return res.sendFile(fileName, { root: './uploads' });
   }
 }

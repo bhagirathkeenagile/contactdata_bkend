@@ -5,6 +5,7 @@ import * as xlsx from 'xlsx';
 import { CreateMapDto } from './dto/create-map.dto';
 import { ConfigService } from '@nestjs/config';
 import { JobsService } from 'src/jobs/jobs.service';
+import { MailService } from 'src/mail/mail.service';
 
 export interface TableData {
   table: string;
@@ -20,6 +21,7 @@ export class MapService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private jobsService: JobsService,
+    private mailService: MailService,
   ) {}
 
   async readExcelFile(filePath: string): Promise<any[]> {
@@ -75,10 +77,45 @@ export class MapService {
       return { errorCode: 'NO_ERROR' };
     }
     // process contact rows immediately
-    const mapStatus = await this.jobsService.ProcessContactRowsImmediately(
+    const status = await this.jobsService.ProcessContactRowsImmediately(
       mappingData.id,
     );
-    return { errorCode: mapStatus.errorCode };
+
+    if (status.errorCode === 'NO_ERROR') {
+      const emailBody = {
+        transactional_message_id: 96,
+        to: 'bhagirathsingh@keenagile.com',
+        from: 'support@itadusa.com',
+        subject: 'Contact Import Summary',
+        identifiers: {
+          email: 'bhagirathsingh@keenagile.com',
+        },
+        message_data: {
+          total_records: status.TotalRecords,
+          inserted_records: status.created,
+          updated_records: status.updated,
+          error_url: `${process.env.APP_URL}/${status.OutputValue.error_url}`,
+          success_url: `${process.env.APP_URL}/${status.OutputValue.success_url}`,
+          exist_records: '100',
+          header_content:
+            'Your Contact Data Import process has been completed, please check the details below: ',
+        },
+        disable_message_retention: false,
+        send_to_unsubscribed: true,
+        tracked: true,
+        queue_draft: false,
+        disable_css_preprocessing: true,
+      };
+
+      this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
+        (await this.mailService.sendUserConfirmation(
+          emailBody,
+          'Contact Upload Completed',
+        ));
+      console.log('Email Sent ');
+    }
+
+    return { errorCode: status.errorCode };
   }
 
   async fetchMapData() {
@@ -255,9 +292,47 @@ export class MapService {
         return { errorCode: 'NO_ERROR' };
       }
       // process contact rows immediately
-      const mapStatus = await this.jobsService.ProcessContactRowsImmediately(
+      const status = await this.jobsService.ProcessContactRowsImmediately(
         updatedMap.id,
       );
+
+      if (status.errorCode === 'NO_ERROR') {
+        const emailBody = {
+          transactional_message_id: 96,
+          to: 'bhagirathsingh@keenagile.com',
+          from: 'support@itadusa.com',
+          subject: 'Contact Import Summary',
+          identifiers: {
+            email: 'bhagirathsingh@keenagile.com',
+          },
+          message_data: {
+            total_records: status.TotalRecords,
+            inserted_records: status.created,
+            error_url: `${process.env.APP_URL}/${status.OutputValue.error_url}`,
+            success_url: `${process.env.APP_URL}/${status.OutputValue.success_url}`,
+            updated_records: status.updated,
+            exist_records: '100',
+            header_content:
+              'Your Contact Data Import process has been completed, please check the details below: ',
+            // err_url: status.OutputValue.',
+          },
+          disable_message_retention: false,
+          send_to_unsubscribed: true,
+          tracked: true,
+          queue_draft: false,
+          disable_css_preprocessing: true,
+        };
+
+        console.log('status.OutputValue----', status.OutputValue.error_url);
+
+        this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
+          (await this.mailService.sendUserConfirmation(
+            emailBody,
+            'Contact Upload Completed',
+          ));
+        console.log('Email Sent ');
+      }
+
       return updatedMap;
     } catch (error) {
       console.log(error);

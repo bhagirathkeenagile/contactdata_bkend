@@ -15,7 +15,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MapService } from './map.service';
 import { CreateMapDto } from './dto/create-map.dto';
 
-
 /**
  * Map Controller
  * @description This Controller is being used for uploading map data.
@@ -25,7 +24,7 @@ import { CreateMapDto } from './dto/create-map.dto';
  */
 @Controller('map')
 export class MapController {
-  constructor(private readonly mapService: MapService) { }
+  constructor(private readonly mapService: MapService) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('excelFile'))
@@ -127,23 +126,25 @@ export class MapController {
   //   return contactLevelMappings;
   // }
   @Put('updatemapFiledById/:id')
-  async updatemapFiledById(@Param('id') id: string | number,@Body() data) {
-    return await this.mapService.updateMapDataById(id,data)
+  async updatemapFiledById(
+    @Param('id') id: string | number,
+    @Body() data: CreateMapDto,
+  ) {
+    return await this.mapService.updateMapDataById(id, data);
   }
 
   @Delete('delMapById/:id')
   async deleteMapdata(@Param('id') id: string | number) {
-    return await this.mapService.deleteByIdMapIteam(id)
+    return await this.mapService.deleteByIdMapIteam(id);
   }
 
   @Get('findMapDataById/:id')
   async findMapFieldDataById(@Param('id') id: string | number) {
-    return await this.mapService.fetchMapDataById(id)
+    return await this.mapService.fetchMapDataById(id);
   }
 
   @Get('cloneMapFieldById/:id')
   async cloneMapFieldById(@Param('id') id: string | number) {
-    return await this.mapService.CloneMapDataById(id)
-
+    return await this.mapService.CloneMapDataById(id);
   }
 }
