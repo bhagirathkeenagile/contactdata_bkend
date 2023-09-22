@@ -313,7 +313,7 @@ export class MapService {
             updated_records: status.updated,
             exist_records: '100',
             header_content:
-              'Your Contact Data Import process has been completed, please check the details below: ',
+              'Your Contact Data Import process has been completed, please check the details below : ',
             // err_url: status.OutputValue.',
           },
           disable_message_retention: false,

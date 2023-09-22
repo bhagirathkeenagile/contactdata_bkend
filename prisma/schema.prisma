@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -47,119 +47,119 @@ model User {
 }
 
 model Accounts {
-  id                                  Int        @id @default(autoincrement())
-  SFDC_ID                             String?    @db.VarChar(255)
-  update_map_history_id               BigInt?    @db.BigInt
-  insert_map_history_id               BigInt?    @db.BigInt
-  IsDeleted                           Boolean?   @default(false)
-  MasterRecordId                      String?    @db.Text
-  Name                                String?    @unique() @db.VarChar(255)
-  Type                                String?    @db.Text
-  ParentId                            String?    @db.Text
-  BillingStreet                       String?    @db.Text
-  BillingCity                         String?    @db.Text
-  BillingState                        String?    @db.Text
-  BillingPostalCode                   String?    @db.Text
-  BillingCountry                      String?    @db.Text
-  BillingLatitude                     Decimal?   @db.Decimal(15, 3)
-  BillingLongitude                    Decimal?   @db.Decimal(15, 3)
-  BillingGeocodeAccuracy              String?    @db.Text
-  BillingAddress                      String?    @db.VarChar(255)
-  ShippingStreet                      String?    @db.Text
-  ShippingCity                        String?    @db.Text
-  ShippingState                       String?    @db.Text
-  ShippingPostalCode                  String?    @db.Text
-  ShippingCountry                     String?    @db.Text
-  ShippingLatitude                    Decimal?   @db.Decimal(15, 3)
-  ShippingLongitude                   Decimal?   @db.Decimal(15, 3)
-  ShippingGeocodeAccuracy             String?    @db.Text
-  ShippingAddress                     String?    @db.Text
-  Phone                               String?    @db.Text
-  Website                             String?    @db.Text
-  PhotoUrl                            String?    @db.Text
-  Industry                            String?    @db.Text
+  id                                  Int       @id @default(autoincrement())
+  SFDC_ID                             String?   @db.VarChar(255)
+  update_map_history_id               BigInt?   @db.BigInt
+  insert_map_history_id               BigInt?   @db.BigInt
+  IsDeleted                           Boolean?  @default(false)
+  MasterRecordId                      String?   @db.Text
+  Name                                String?   @unique() @db.VarChar(255)
+  Type                                String?   @db.Text
+  ParentId                            String?   @db.Text
+  BillingStreet                       String?   @db.Text
+  BillingCity                         String?   @db.Text
+  BillingState                        String?   @db.Text
+  BillingPostalCode                   String?   @db.Text
+  BillingCountry                      String?   @db.Text
+  BillingLatitude                     Decimal?  @db.Decimal(15, 3)
+  BillingLongitude                    Decimal?  @db.Decimal(15, 3)
+  BillingGeocodeAccuracy              String?   @db.Text
+  BillingAddress                      String?   @db.VarChar(255)
+  ShippingStreet                      String?   @db.Text
+  ShippingCity                        String?   @db.Text
+  ShippingState                       String?   @db.Text
+  ShippingPostalCode                  String?   @db.Text
+  ShippingCountry                     String?   @db.Text
+  ShippingLatitude                    Decimal?  @db.Decimal(15, 3)
+  ShippingLongitude                   Decimal?  @db.Decimal(15, 3)
+  ShippingGeocodeAccuracy             String?   @db.Text
+  ShippingAddress                     String?   @db.Text
+  Phone                               String?   @db.Text
+  Website                             String?   @db.Text
+  PhotoUrl                            String?   @db.Text
+  Industry                            String?   @db.Text
   NumberOfEmployees                   Int?
-  Description                         String?    @db.Text
-  OwnerId                             String?    @db.Text
-  CreatedDate                         DateTime?  @default(now())
-  CreatedById                         String?    @db.Text
+  Description                         String?   @db.Text
+  OwnerId                             String?   @db.Text
+  CreatedDate                         DateTime? @default(now())
+  CreatedById                         String?   @db.Text
   LastModifiedDate                    DateTime?
-  LastModifiedById                    String?    @db.Text
+  LastModifiedById                    String?   @db.Text
   SystemModstamp                      DateTime?
   LastActivityDate                    DateTime?
   LastViewedDate                      DateTime?
   LastReferencedDate                  DateTime?
-  IsCustomerPortal                    Boolean?   @default(false)
-  Jigsaw                              String?    @db.Text
-  JigsawCompanyId                     String?    @db.Text
-  AccountSource                       String?    @db.Text
-  SicDesc                             String?    @db.Text
-  Domain__c                           String?    @db.Text
-  Batch_Size__c                       Decimal?   @db.Decimal(15, 2)
-  IT_Employees_old__c                 Decimal?   @db.Decimal(18, 0)
-  Fortune_Rank__c                     Decimal?   @db.Decimal(18, 0)
-  IT_Budget_Million__c                Decimal?   @db.Decimal(18, 0)
-  Number_of_Contacts__c               Decimal?   @db.Decimal(5, 0)
-  Revenue__c                          Decimal?   @db.Decimal(18, 0)
-  Marketing_Suppression__c            String?    @db.Text
-  First_Sender_and_Date__c            String?    @db.Text
-  Suppression_Reason__c               String?    @db.Text
-  Active_Contacts__c                  Decimal?   @db.Decimal(4, 0)
-  AccountOwnerCheck__c                Boolean?   @default(false)
-  Total_Available_Credits__c          Decimal?   @db.Decimal(15, 3)
-  Apollo_Account_ID__c                String?    @db.Text
-  Suppressed_By__c                    String?    @db.Text
+  IsCustomerPortal                    Boolean?  @default(false)
+  Jigsaw                              String?   @db.Text
+  JigsawCompanyId                     String?   @db.Text
+  AccountSource                       String?   @db.Text
+  SicDesc                             String?   @db.Text
+  Domain__c                           String?   @db.Text
+  Batch_Size__c                       Decimal?  @db.Decimal(15, 2)
+  IT_Employees_old__c                 Decimal?  @db.Decimal(18, 0)
+  Fortune_Rank__c                     Decimal?  @db.Decimal(18, 0)
+  IT_Budget_Million__c                Decimal?  @db.Decimal(18, 0)
+  Number_of_Contacts__c               Decimal?  @db.Decimal(5, 0)
+  Revenue__c                          Decimal?  @db.Decimal(18, 0)
+  Marketing_Suppression__c            String?   @db.Text
+  First_Sender_and_Date__c            String?   @db.Text
+  Suppression_Reason__c               String?   @db.Text
+  Active_Contacts__c                  Decimal?  @db.Decimal(4, 0)
+  AccountOwnerCheck__c                Boolean?  @default(false)
+  Total_Available_Credits__c          Decimal?  @db.Decimal(15, 3)
+  Apollo_Account_ID__c                String?   @db.Text
+  Suppressed_By__c                    String?   @db.Text
   Suppression_Date__c                 DateTime?
   Hard_Drive_Parent_Asset_Required__c Boolean?
-  Trimmed_Website__c                  String?    @db.Text
+  Trimmed_Website__c                  String?   @db.Text
   Lot_Last_Created__c                 DateTime?
   Opportunity_Last_Created__c         DateTime?
-  Internal_Brand__c                   String?    @db.Text
-  Phone_US__c                         String?    @db.Text
-  Total_Opportunities__c              Decimal?   @db.Decimal(15, 3)
-  Won_Opportunities__c                Decimal?   @db.Decimal(15, 3)
-  Terms__c                            String?    @db.Text
-  RingLead_Archive__c                 String?    @db.Text
+  Internal_Brand__c                   String?   @db.Text
+  Phone_US__c                         String?   @db.Text
+  Total_Opportunities__c              Decimal?  @db.Decimal(15, 3)
+  Won_Opportunities__c                Decimal?  @db.Decimal(15, 3)
+  Terms__c                            String?   @db.Text
+  RingLead_Archive__c                 String?   @db.Text
   Merged_DateTime__c                  DateTime?
-  Outreach_URL__c                     String?    @db.Text
-  Notification_Emails__c              String?    @db.Text
+  Outreach_URL__c                     String?   @db.Text
+  Notification_Emails__c              String?   @db.Text
   Payment_Past_Due__c                 Boolean?
-  Notes__c                            String?    @db.Text
-  Razor_Customer_ID__c                String?    @db.Text
+  Notes__c                            String?   @db.Text
+  Razor_Customer_ID__c                String?   @db.Text
   Razor_Needs_Updated__c              Boolean?
-  RingLead_Score__c                   Decimal?   @db.Decimal(4, 0)
+  RingLead_Score__c                   Decimal?  @db.Decimal(4, 0)
   DOZISF__ZoomInfo_First_Updated__c   DateTime?
-  DOZISF__ZoomInfo_Id__c              String?    @db.Text
+  DOZISF__ZoomInfo_Id__c              String?   @db.Text
   DOZISF__ZoomInfo_Last_Updated__c    DateTime?
-  Work_Instruction__c                 String?    @db.Text
+  Work_Instruction__c                 String?   @db.Text
   Shipping_Vendor__c                  Boolean?
   Signed_MSA__c                       Boolean?
-  Coverage_Area_Shipping_Vendors__c   String?    @db.Text
-  Primary_Contact__c                  String?    @db.Text
-  Services_Available__c               String?    @db.Text
+  Coverage_Area_Shipping_Vendors__c   String?   @db.Text
+  Primary_Contact__c                  String?   @db.Text
+  Services_Available__c               String?   @db.Text
   CustomerPortalAccess__c             Boolean?
-  WFHCode__c                          String?    @db.Text
-  WFHUrl__c                           String?    @db.Text
+  WFHCode__c                          String?   @db.Text
+  WFHUrl__c                           String?   @db.Text
   Only_Process_In_House__c            Boolean?
-  ZoomInfo_URL__c                     String?    @db.Text
-  Defunct__c                          String?    @db.Text
+  ZoomInfo_URL__c                     String?   @db.Text
+  Defunct__c                          String?   @db.Text
   Service_Vendor__c                   Boolean?
   Rolling_Balance__c                  Boolean?
-  Notes_for_Settlements__c            String?    @db.Text
+  Notes_for_Settlements__c            String?   @db.Text
   Compliance_Agreement_Signed__c      Boolean?
-  Downstream_Shipping__c              String?    @db.Text
-  Size_Category_V2__c                 String?    @db.Text
-  Default_Customer_Expectation__c     String?    @db.Text
-  To_Trigger_Update__c                String?    @db.Text
-  Account_ID_Text__c                  String?    @db.Text
-  myTime                              String?    @db.VarChar(255)
-  is_testing                          Int        @default(0)
-  created_at                          DateTime   @default(now())
-  updated_at                          DateTime   @default(now()) @updatedAt
+  Downstream_Shipping__c              String?   @db.Text
+  Size_Category_V2__c                 String?   @db.Text
+  Default_Customer_Expectation__c     String?   @db.Text
+  To_Trigger_Update__c                String?   @db.Text
+  Account_ID_Text__c                  String?   @db.Text
+  myTime                              String?   @db.VarChar(255)
+  is_testing                          Int       @default(0)
+  created_at                          DateTime  @default(now())
+  updated_at                          DateTime  @default(now()) @updatedAt
   deleted_at                          DateTime?
   Contact                             Contact[]
-  Searches                            Searches[]
-  Roles                               Roles[]
+  //Searches                            Searches[]
+  //Roles                               Roles[]
 }
 
 model Contact {
@@ -297,6 +297,7 @@ model Contact {
   created_at                                 DateTime  @default(now())
   updated_at                                 DateTime  @default(now()) @updatedAt
   deleted_at                                 DateTime?
+
   @@unique([Email, LastName, FirstName], name: "contactIdentifier")
 }
 
@@ -326,7 +327,7 @@ model Searches {
   id         Int      @id @default(autoincrement())
   name       String
   page       String
-  Account    Accounts @relation(fields: [accountsId], references: [id])
+  //Account    Accounts @relation(fields: [accountsId], references: [id])
   accountsId Int
   content    String   @db.Text
   created_at DateTime @default(now())
@@ -336,7 +337,7 @@ model Searches {
 model Roles {
   id             Int      @id @default(autoincrement())
   name           String
-  Account        Accounts @relation(fields: [accountsId], references: [id])
+  //Account        Accounts @relation(fields: [accountsId], references: [id])
   access         String
   contactModule  String
   mapsModule     String
