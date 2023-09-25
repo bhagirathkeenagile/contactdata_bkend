@@ -99,6 +99,22 @@ export class JobsService {
                 cleanedcolumName.slice(1).trim()
             ] = row[field.excelHeader];
           });
+
+          for (const key in accountsData) {
+            if (accountsData.hasOwnProperty(key)) {
+              // Check if key is 'DOZISF__ZoomInfo_Id__c'
+
+              if (key === 'BillingPostalCode') {
+                accountsData[key] = String(accountsData[key]);
+              }
+              if (key === 'DOZISF__ZoomInfo_Id__c') {
+                accountsData[key] = String(accountsData[key]);
+              }
+              if (key === 'BillingStreet') {
+                accountsData[key] = String(accountsData[key]);
+              }
+            }
+          }
           accountsData_new.push(accountsData);
 
           if (!accountsMap.has(accountsData['Name'])) {
@@ -135,6 +151,29 @@ export class JobsService {
               '',
             );
           });
+
+          /**
+           * Convert type to String of Postal Code
+           */
+
+          for (const key in contactsData) {
+            if (contactsData.hasOwnProperty(key)) {
+              // Check if key is 'DOZISF__ZoomInfo_Id__c'
+              if (key === 'DOZISF__ZoomInfo_Id__c') {
+                contactsData[key] = String(contactsData[key]);
+              }
+              if (key === 'Quickmail_Tags__c') {
+                contactsData[key] = String(contactsData[key]);
+              }
+              if (key === 'BillingPostalCode') {
+                contactsData[key] = String(contactsData[key]);
+              }
+              if (key === 'MailingPostalCode') {
+                contactsData[key] = String(contactsData[key]);
+              }
+            }
+          }
+
           // console.log('contactsDatacontactsData->>', contactsData);
           contactsData['AccountName'] = accountsData['Name'];
 
@@ -225,6 +264,7 @@ export class JobsService {
        * New Bulk Code for Insert and Update
        */
       console.log('Map Action', map.action);
+      let errorString = '';
       if (map.action === 'Update' || map.action === 'Insert And Update') {
         console.log('Insert And Update Query Start Time', new Date());
 
@@ -252,9 +292,10 @@ export class JobsService {
           'bulkAccountToInsert Length...',
           bulkAccountToInsert.length,
         );
+
         if (bulkAccountToInsert.length > 0) {
-          for (let i = 0; i < bulkAccountToInsert.length; i += 1000) {
-            const batchToInsert = bulkAccountToInsert.slice(i, i + 1000);
+          for (let i = 0; i < bulkAccountToInsert.length; i += 50) {
+            const batchToInsert = bulkAccountToInsert.slice(i, i + 50);
             console.log('Insert Loop Start--', i);
             try {
               //console.log('batchToInsert--', batchToInsert);
@@ -265,38 +306,7 @@ export class JobsService {
               );
             } catch (err) {
               console.log('Account Error-', err.message);
-              // return;
-              // const emailBody = {
-              //   transactional_message_id: 96,
-              //   to: 'bhagirathsingh@keenagile.com',
-              //   from: 'support@itadusa.com',
-              //   subject: 'Contact Import Summary',
-              //   identifiers: {
-              //     email: 'bhagirathsingh@keenagile.com',
-              //   },
-              //   message_data: {
-              //     total_records: 0,
-              //     inserted_records: 0,
-              //     updated_records: 0,
-              //     exist_records: '100',
-              //     header_content: `Import process has been failed, and we found this error: ${err.message}`,
-              //   },
-              // };
-
-              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
-              //   (await this.mailService.sendUserConfirmation(
-              //     emailBody,
-              //     'Contact Upload Completed',
-              //   ));
-
-              // return {
-              //   errorCode: 'ERROR',
-              //   message: 'Something went wrong',
-              //   created: 0,
-              //   updated: 0,
-              //   TotalRecords: 0,
-              //   OutputValue: null,
-              // };
+              errorString += err.message + '<br>';
               errorContactsData.push(batchToInsert);
             }
           }
@@ -323,15 +333,11 @@ export class JobsService {
 
               // let combinedQuery;
               try {
-                //  await this.prisma.$transaction(
-                //  async (transaction) => {
                 let combinedQuery = '';
-                //  console.log('Check-6', new Date());
+
                 let ctr = 0;
                 console.log('COunt of Batch -', batch.length);
                 for (const record of batch) {
-                  //  console.log('ctr---', ctr++);
-                  // console.log('Check-7', new Date());
                   const { id, ...updateFields } = record;
                   const idsToUpdate = batch.map((record) => record.id);
                   // console.log('Check-8', new Date());
@@ -347,6 +353,26 @@ export class JobsService {
                       ${updateFieldsString}
                     WHERE id = ${id};
                   `;
+                  // const updateFieldsString = Object.keys(updateFields)
+                  //   .filter((key) => key !== 'id')
+                  //   .map((key) => {
+                  //     if (typeof updateFields[key] === 'string') {
+                  //       return `${key} = '${updateFields[key].replace(
+                  //         /'/g,
+                  //         "''",
+                  //       )}'`;
+                  //     } else {
+                  //       return `${key} = ${updateFields[key]}`;
+                  //     }
+                  //   })
+                  //   .join(', ');
+
+                  // const updateQuery = `
+                  //   UPDATE accounts
+                  //   SET
+                  //   ${updateFieldsString}
+                  //   WHERE id = ${id};
+                  //   `;
 
                   //  console.log('Check-9', new Date());
 
@@ -361,28 +387,16 @@ export class JobsService {
 
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
                 console.log('Check-10', new Date());
-
-                // },
-                // {
-                //   maxWait: 9000, // default: 2000
-                //   timeout: 990000, // default: 5000
-                //   //  isolationLevel:
-                //   //   Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
-                // },
-                // );
-                //  console.log('Data Update Time in Loop--', new Date());
                 console.log(`Committed updates for ${batch.length} records.`);
               } catch (error) {
                 console.error('Transaction error:', error);
+                errorString += error.message + '<br>';
                 throw error; // Handle or log the error as needed
               }
 
               startIndex += batchSize;
             }
-
             await this.prisma.$disconnect();
-
-            // console.log('updateAccounts--', updateFields);
           } catch (err) {
             console.log(err.message);
             // return;
@@ -392,13 +406,16 @@ export class JobsService {
         /** Contact Process start from here */
         console.log('Contact Process start...');
         const allContacts = await this.prisma.contact.findMany();
+        const allNewAccounts = await this.prisma.accounts.findMany();
+        const AllNewaccountsMap = new Map<string, any>();
+        for (const account of allNewAccounts) {
+          AllNewaccountsMap.set(account.Name, account);
+        }
 
         const AllcontactsMap = new Map<string, any>();
         const bulkContactToInsert = [];
         const bulkContactToUpdate = [];
         const allContactIds = [];
-
-        const contactPromises = [];
 
         for (const contact of allContacts) {
           AllcontactsMap.set(contact.Email, contact);
@@ -406,6 +423,12 @@ export class JobsService {
         }
         console.log('contactsData_new Length-', contactsData_new.length);
         for (const contactData_new of contactsData_new) {
+          if (AllNewaccountsMap.get(contactData_new.AccountName)) {
+            contactData_new['AccountId'] = AllNewaccountsMap.get(
+              contactData_new.AccountName,
+            ).id;
+          }
+
           if (AllcontactsMap.get(contactData_new.Email)) {
             contactData_new['id'] = AllcontactsMap.get(
               contactData_new.Email,
@@ -417,9 +440,11 @@ export class JobsService {
         }
         console.log('bulkContactToInsert Start...');
         console.log('bulkContactToInsert Length-', bulkContactToInsert.length);
+
         if (bulkContactToInsert.length > 0) {
-          for (let i = 0; i < bulkContactToInsert.length; i += 500) {
-            const batchToInsert = bulkContactToInsert.slice(i, i + 500);
+          const contactPromises = [];
+          for (let i = 0; i < bulkContactToInsert.length; i += 50) {
+            const batchToInsert = bulkContactToInsert.slice(i, i + 50);
             try {
               //console.log('batchToInsert--', batchToInsert);
 
@@ -427,7 +452,7 @@ export class JobsService {
                 const { AccountName, ...rest } = item; // Destructure AccountName and get the rest of the object
                 return rest; // Return the modified object without AccountName
               });
-
+              //  console.log('modifiedBatch--', modifiedBatch);
               const InsertStatus = contactPromises.push(
                 await this.prisma.contact.createMany({
                   data: modifiedBatch,
@@ -435,38 +460,8 @@ export class JobsService {
               );
             } catch (err) {
               console.log('ERRRRR-', err.message);
-              // return;
-              // const emailBody = {
-              //   transactional_message_id: 96,
-              //   to: 'bhagirathsingh@keenagile.com',
-              //   from: 'support@itadusa.com',
-              //   subject: 'Contact Import Summary',
-              //   identifiers: {
-              //     email: 'bhagirathsingh@keenagile.com',
-              //   },
-              //   message_data: {
-              //     total_records: 0,
-              //     inserted_records: 0,
-              //     updated_records: 0,
-              //     exist_records: '100',
-              //     header_content: `Import process has been failed, and we found this error: ${err.message}`,
-              //   },
-              // };
+              errorString += err.message + '<br>';
 
-              // this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
-              //   (await this.mailService.sendUserConfirmation(
-              //     emailBody,
-              //     'Contact Upload Completed',
-              //   ));
-
-              // return {
-              //   errorCode: 'ERROR',
-              //   message: 'Something went wrong',
-              //   created: 0,
-              //   updated: 0,
-              //   TotalRecords: 0,
-              //   OutputValue: null,
-              // };
               errorContactsData.push(batchToInsert);
             }
           }
@@ -476,7 +471,7 @@ export class JobsService {
         // update contacts start from here
         if (bulkContactToUpdate.length > 0) {
           try {
-            const batchSize = 500;
+            const batchSize = 100;
             let startIndex = 0;
             // console.log('While-1');
             while (startIndex < bulkContactToUpdate.length) {
@@ -511,39 +506,32 @@ export class JobsService {
                     WHERE id = ${id};
                   `;
 
-                  // const updateQueries = [
-                  //   `
-                  //       UPDATE Contact
-                  //       SET
-                  //       ${Object.keys(updateFields)
-                  //         .map((key) => `${key} = '${updateFields[key]}'`)
-                  //         .join(', ')}
-                  //       WHERE id = ${id};
-                  //     `,
-                  // ];
-                  //  console.log('While-7');
-                  combinedQuery += updateQuery + '\n';
-                  // const combinedQuery = updateQueries.join('\n');
-                  //  console.log('combinedQuery---', combinedQuery);
+                  // const updateFieldsString = Object.keys(updateFields)
+                  //   .filter((key) => key !== 'id')
+                  //   .map(
+                  //     (key) =>
+                  //       `${key} = '${updateFields[key].replace(/'/g, "''")}'`,
+                  //   )
+                  //   .join(', ');
 
-                  // const result = await this.prisma.$queryRawUnsafe(
-                  //   combinedQuery,
-                  // );
+                  // const updateQuery = `
+                  // UPDATE Contact
+                  // SET
+                  // ${updateFieldsString}
+                  // WHERE id = ${id};
+                  // `;
+
+                  combinedQuery += updateQuery + '\n';
                 }
                 //console.log('combinedQuery---', combinedQuery);
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
-                // },
-                // {
-                //   maxWait: 9000, // default: 2000
-                //   timeout: 990000, // default: 5000
-                //   //  isolationLevel:
-                //   //   Prisma.TransactionIsolationLevel.Serializable, // optional, default defined by database configuration
-                // },
-                // );
-                //  console.log('Data Update Time in Loop--', new Date());
-                console.log(`Committed updates for ${batch.length} records.`);
+
+                console.log(
+                  `Committed updates Contact for ${batch.length} records.`,
+                );
               } catch (error) {
                 console.error('Transaction error:', error);
+                errorString += error.message + '<br>';
                 throw error; // Handle or log the error as needed
               }
 
@@ -570,8 +558,8 @@ export class JobsService {
         const accountsToInsert = Array.from(accountsMap.values());
 
         const accountPromises = [];
-        for (let i = 0; i < accountsToInsert.length; i += 1000) {
-          const batchToInsert = accountsToInsert.slice(i, i + 1000);
+        for (let i = 0; i < accountsToInsert.length; i += 100) {
+          const batchToInsert = accountsToInsert.slice(i, i + 100);
           try {
             const InsertStatus = accountPromises.push(
               await this.prisma.accounts.createMany({
@@ -634,8 +622,8 @@ export class JobsService {
         }
 
         const ContactPromises = [];
-        for (let i = 0; i < ContactDataToInsert.length; i += 1000) {
-          const batchToInsert = ContactDataToInsert.slice(i, i + 1000);
+        for (let i = 0; i < ContactDataToInsert.length; i += 100) {
+          const batchToInsert = ContactDataToInsert.slice(i, i + 100);
           try {
             const InsertStatus = ContactPromises.push(
               await this.prisma.contact.createMany({
@@ -690,9 +678,9 @@ export class JobsService {
       const SuccessFileName = `uploads/Success_${currentDate}_map_${map.name}.csv`;
       OutputData['error_url'] = `jobs/${fileName}`;
       OutputData['success_url'] = `jobs/${SuccessFileName}`;
-      //  console.log('SuccessContactsData---->', SuccessContactsData);
+      console.log('errorString---->', errorString);
 
-      this.writeDataToCsv(errorContactsData, fileName);
+      this.writeDataToCsv(errorString, fileName);
       this.writeDataToCsv(SuccessContactsData, SuccessFileName);
 
       return {
@@ -740,8 +728,8 @@ export class JobsService {
     }
   }
 
-  async writeDataToCsv(data: any[], filePath: string) {
-    if (data.length > 0) {
+  async writeDataToCsv(data: any, filePath: string) {
+    if (typeof data != 'string' && data.length > 0) {
       const header = Object.keys(data[0]);
       const csvWriter = createObjectCsvWriter({
         path: filePath,
@@ -754,8 +742,11 @@ export class JobsService {
         path: filePath,
         header: [{ id: 'message', title: 'Message' }],
       });
-
-      await csvWriter.writeRecords([{ message: 'No data found' }]);
+      if (data) {
+        await csvWriter.writeRecords([{ message: data }]);
+      } else {
+        await csvWriter.writeRecords([{ message: 'No data found' }]);
+      }
     }
   }
 
