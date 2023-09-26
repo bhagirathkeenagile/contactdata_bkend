@@ -61,6 +61,7 @@ export class JobsService {
       const errorAccountsData = [];
       const errorContactsData = [];
       const SuccessContactsData = [];
+      const SuccessAccountsData = [];
       const OutputData = [];
 
       //console.log('map', map.mapping);
@@ -304,10 +305,15 @@ export class JobsService {
                   data: batchToInsert,
                 }),
               );
+              for (const record of batchToInsert) {
+                SuccessAccountsData.push(record);
+              }
             } catch (err) {
               console.log('Account Error-', err.message);
               errorString += err.message + '<br>';
-              errorContactsData.push(batchToInsert);
+              for (const record of batchToInsert) {
+                errorAccountsData.push(record);
+              }
             }
           }
         }
@@ -377,6 +383,9 @@ export class JobsService {
                   //  console.log('Check-9', new Date());
 
                   combinedQuery += updateQuery + '\n';
+
+                  SuccessAccountsData.push(record);
+
                   //  console.log('combinedQuery-', combinedQuery);
                 }
                 console.log('For loop end');
@@ -389,8 +398,12 @@ export class JobsService {
                 console.log('Check-10', new Date());
                 console.log(`Committed updates for ${batch.length} records.`);
               } catch (error) {
+                for (const record of batch) {
+                  errorAccountsData.push(record);
+                }
                 console.error('Transaction error:', error);
                 errorString += error.message + '<br>';
+
                 throw error; // Handle or log the error as needed
               }
 
@@ -399,10 +412,13 @@ export class JobsService {
             await this.prisma.$disconnect();
           } catch (err) {
             console.log(err.message);
+
             // return;
           }
         }
         console.log('bulkAccountToUpdate End');
+        // console.log('errorAccountsData-->>', errorAccountsData);
+
         /** Contact Process start from here */
         console.log('Contact Process start...');
         const allContacts = await this.prisma.contact.findMany();
@@ -445,10 +461,11 @@ export class JobsService {
           const contactPromises = [];
           for (let i = 0; i < bulkContactToInsert.length; i += 50) {
             const batchToInsert = bulkContactToInsert.slice(i, i + 50);
+            let modifiedBatch = [];
             try {
               //console.log('batchToInsert--', batchToInsert);
 
-              const modifiedBatch = batchToInsert.map((item) => {
+              modifiedBatch = batchToInsert.map((item) => {
                 const { AccountName, ...rest } = item; // Destructure AccountName and get the rest of the object
                 return rest; // Return the modified object without AccountName
               });
@@ -458,11 +475,16 @@ export class JobsService {
                   data: modifiedBatch,
                 }),
               );
+
+              for (const record of modifiedBatch) {
+                SuccessContactsData.push(record);
+              }
             } catch (err) {
               console.log('ERRRRR-', err.message);
               errorString += err.message + '<br>';
-
-              errorContactsData.push(batchToInsert);
+              for (const record of modifiedBatch) {
+                errorContactsData.push(record);
+              }
             }
           }
         }
@@ -520,7 +542,7 @@ export class JobsService {
                   // ${updateFieldsString}
                   // WHERE id = ${id};
                   // `;
-
+                  SuccessContactsData.push(record);
                   combinedQuery += updateQuery + '\n';
                 }
                 //console.log('combinedQuery---', combinedQuery);
@@ -530,6 +552,9 @@ export class JobsService {
                   `Committed updates Contact for ${batch.length} records.`,
                 );
               } catch (error) {
+                for (const record of batch) {
+                  errorContactsData.push(batch);
+                }
                 console.error('Transaction error:', error);
                 errorString += error.message + '<br>';
                 throw error; // Handle or log the error as needed
@@ -546,6 +571,7 @@ export class JobsService {
             // return;
           }
         }
+        //console.log('errorContactsData-->', errorContactsData);
 
         console.log('bulkAccountToUpdate-->', bulkAccountToUpdate.length);
         console.log('bulkAccountToInsert-->', bulkAccountToInsert.length);
@@ -674,14 +700,29 @@ export class JobsService {
       // console.log('errorContactsData--', errorContactsData);
 
       const currentDate = new Date().toISOString().replace(/:/g, '-');
-      const fileName = `uploads/Error_${currentDate}_map_${map.name}.csv`;
-      const SuccessFileName = `uploads/Success_${currentDate}_map_${map.name}.csv`;
-      OutputData['error_url'] = `jobs/${fileName}`;
-      OutputData['success_url'] = `jobs/${SuccessFileName}`;
-      console.log('errorString---->', errorString);
+      const fileName_contacts = `uploads/Err_cnt_${currentDate}_map_${map.name}.csv`;
+      const fileName_Accounts = `uploads/Err_act_${currentDate}_map_${map.name}.csv`;
+      const SuccessFileName_cnt = `uploads/Success_cnt_${currentDate}_map_${map.name}.csv`;
+      const SuccessFileName_act = `uploads/Success_act_${currentDate}_map_${map.name}.csv`;
+      OutputData['error_url_cnt'] = `jobs/${fileName_contacts}`;
+      OutputData['error_url_act'] = `jobs/${fileName_Accounts}`;
+      OutputData['success_url_cnt'] = `jobs/${SuccessFileName_cnt}`;
+      OutputData['success_url_act'] = `jobs/${SuccessFileName_act}`;
+      //console.log('errorString--->', errorString);
 
-      this.writeDataToCsv(errorString, fileName);
-      this.writeDataToCsv(SuccessContactsData, SuccessFileName);
+      //  const flattenedData = [].concat.apply([], errorContactsData);
+      console.log(
+        'errorAccountsData',
+        errorAccountsData,
+        errorAccountsData.length,
+      );
+      const flattenedData = [].concat.apply([], errorAccountsData);
+      console.log('flattenedData', flattenedData, flattenedData.length);
+      this.writeDataToCsv(errorAccountsData, fileName_Accounts);
+      this.writeDataToCsv(errorContactsData, fileName_contacts);
+
+      this.writeDataToCsv(SuccessContactsData, SuccessFileName_cnt);
+      this.writeDataToCsv(SuccessAccountsData, SuccessFileName_act);
 
       return {
         errorCode: 'NO_ERROR',
@@ -728,25 +769,32 @@ export class JobsService {
     }
   }
 
-  async writeDataToCsv(data: any, filePath: string) {
-    if (typeof data != 'string' && data.length > 0) {
-      const header = Object.keys(data[0]);
-      const csvWriter = createObjectCsvWriter({
-        path: filePath,
-        header: header,
-      });
+  async writeDataToCsv(data: any[], filePath: string) {
+    if (data.length > 0) {
+      // const header = Object.keys(data[0]);
+      // const csvWriter = createObjectCsvWriter({
+      //   path: filePath,
+      //   header: header,
+      // });
 
-      await csvWriter.writeRecords(data);
+      // await csvWriter.writeRecords(data);
+
+      const rows = data.map((item) => Object.values(item));
+      const header = Object.keys(data[0]);
+      const csvContent = `${header.join(',')}\n${rows
+        .map((row) => row.join(','))
+        .join('\n')}`;
+      try {
+        fs.writeFileSync(filePath, csvContent);
+        console.log(`CSV file written to ${filePath}`);
+      } catch (error) {
+        console.error(`Error writing CSV file: ${error}`);
+      }
     } else {
       const csvWriter = createObjectCsvWriter({
         path: filePath,
         header: [{ id: 'message', title: 'Message' }],
       });
-      if (data) {
-        await csvWriter.writeRecords([{ message: data }]);
-      } else {
-        await csvWriter.writeRecords([{ message: 'No data found' }]);
-      }
     }
   }
 

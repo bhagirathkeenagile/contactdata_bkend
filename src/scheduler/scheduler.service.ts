@@ -62,6 +62,8 @@ export class SchedulerService {
             total_records: status.TotalRecords,
             inserted_records: status.created,
             updated_records: status.updated,
+            error_url: status.OutputValue.error_url,
+            success_url: status.OutputValue.success_url,
             exist_records: '100',
             header_content:
               'Your Contact Data Import process has been completed, please check the details below: ',
