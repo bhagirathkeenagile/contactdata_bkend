@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { JobsService } from 'src/jobs/jobs.service';
 import { MailService } from 'src/mail/mail.service';
 import { PrismaService } from 'src/prisma.service';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 @Injectable()
 export class SchedulerService {
@@ -12,9 +13,22 @@ export class SchedulerService {
     private configService: ConfigService,
     private jobsService: JobsService,
     private mailService: MailService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  emitEvent() {
+    this.eventEmitter.emit('msg.sent', this.newevent());
+  }
+  newevent() {
+    return 'This is new test from method';
+  }
+
+  @OnEvent('msg.sent')
+  listentToEvent(msg: string) {
+    console.log('Message Received: ', msg);
+  }
+
+  //@Cron(CronExpression.EVERY_30_SECONDS)
   async handleCron() {
     //this.logger.debug('Called when the current second is 45');
     //console.log(new Date());
@@ -62,8 +76,10 @@ export class SchedulerService {
             total_records: status.TotalRecords,
             inserted_records: status.created,
             updated_records: status.updated,
-            error_url: status.OutputValue.error_url,
-            success_url: status.OutputValue.success_url,
+            error_url_cnt: status.OutputValue.error_url_cnt,
+            error_url_act: status.OutputValue.error_url_act,
+            success_url_cnt: status.OutputValue.success_url_cnt,
+            success_url_act: status.OutputValue.success_url_act,
             exist_records: '100',
             header_content:
               'Your Contact Data Import process has been completed, please check the details below: ',

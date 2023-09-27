@@ -14,11 +14,14 @@ import { SearchModule } from './search/search.module';
 // import { SchedulerControllerController } from './scheduler-controller/scheduler-controller.controller';
 import { SchedulerModule } from './scheduler/scheduler.module';
 // import { SchedulerControllerController } from './scheduler-controller/scheduler-controller.controller';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { EventService } from './events/events.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     //ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     ExcelModule,
     MapModule,
     JobsModule,
@@ -28,6 +31,6 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     SchedulerModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, EventService],
 })
 export class AppModule {}

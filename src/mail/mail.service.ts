@@ -45,7 +45,7 @@ export class MailService {
       disable_css_preprocessing: true,
     };
 
-    console.log('Type of ', typeof emailBody);
+    console.log('Type of ', typeof emailBody111);
     console.log('Email Sent 0001');
     const options = {
       hostname: 'api.customer.io',
@@ -70,7 +70,7 @@ export class MailService {
           const headers = res.headers;
           const status = res.statusCode;
           const response = { content, headers, status };
-          console.log('response', response);
+          console.log('Email response--', response);
           resolve(response);
         });
       });
@@ -79,7 +79,7 @@ export class MailService {
         reject(e);
         console.log('Message error', e);
       });
-      console.log('emailBody', typeof JSON.stringify(emailBody));
+      console.log('emailBody--', typeof JSON.stringify(emailBody));
 
       req.write(JSON.stringify(emailBody111));
       req.end();
