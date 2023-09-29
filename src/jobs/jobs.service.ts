@@ -74,6 +74,12 @@ export class JobsService {
       });
       let created = 0;
       let updated = 0;
+      let acnt_inserted = 0;
+      let acnt_updated = 0;
+      let acnt_failed = 0;
+      let cnt_inserted = 0;
+      let cnt_updated = 0;
+      let cnt_failed = 0;
       const errorAccountsData = [];
       const errorContactsData = [];
       const SuccessContactsData = [];
@@ -128,6 +134,9 @@ export class JobsService {
                 accountsData[key] = String(accountsData[key]);
               }
               if (key === 'BillingStreet') {
+                accountsData[key] = String(accountsData[key]);
+              }
+              if (key === 'Name') {
                 accountsData[key] = String(accountsData[key]);
               }
             }
@@ -186,6 +195,9 @@ export class JobsService {
                 contactsData[key] = String(contactsData[key]);
               }
               if (key === 'MailingPostalCode') {
+                contactsData[key] = String(contactsData[key]);
+              }
+              if (key === 'DOZISF__ZoomInfo_Company_ID__c') {
                 contactsData[key] = String(contactsData[key]);
               }
             }
@@ -296,7 +308,19 @@ export class JobsService {
           AllaccountsMap.set(account.Name, account);
           allAccountIds.push(account.id);
         }
-        for (const accountData_new of accountsData_new) {
+
+        const uniqueData = [];
+
+        accountsData_new.forEach((item) => {
+          if (!uniqueData[item.Name]) {
+            uniqueData[item.Name] = item;
+          }
+        });
+
+        const result = Object.values(uniqueData);
+        console.log('result--', result);
+
+        for (const accountData_new of result) {
           if (AllaccountsMap.get(accountData_new.Name)) {
             accountData_new['id'] = AllaccountsMap.get(accountData_new.Name).id;
             bulkAccountToUpdate.push(accountData_new);
@@ -324,7 +348,9 @@ export class JobsService {
               for (const record of batchToInsert) {
                 SuccessAccountsData.push(record);
               }
+              acnt_inserted += batchToInsert.length;
             } catch (err) {
+              acnt_failed += batchToInsert.length;
               console.log('Account Error-', err.message);
               errorString += err.message + '<br>';
               for (const record of batchToInsert) {
@@ -411,6 +437,7 @@ export class JobsService {
                 //  console.log('combinedQuery---', combinedQuery);
 
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
+                acnt_updated += batch.length;
                 console.log('Check-10', new Date());
                 console.log(`Committed updates for ${batch.length} records.`);
               } catch (error) {
@@ -459,15 +486,15 @@ export class JobsService {
             contactData_new['AccountId'] = AllNewaccountsMap.get(
               contactData_new.AccountName,
             ).id;
-          }
 
-          if (AllcontactsMap.get(contactData_new.Email)) {
-            contactData_new['id'] = AllcontactsMap.get(
-              contactData_new.Email,
-            ).id;
-            bulkContactToUpdate.push(contactData_new);
-          } else {
-            bulkContactToInsert.push(contactData_new);
+            if (AllcontactsMap.get(contactData_new.Email)) {
+              contactData_new['id'] = AllcontactsMap.get(
+                contactData_new.Email,
+              ).id;
+              bulkContactToUpdate.push(contactData_new);
+            } else {
+              bulkContactToInsert.push(contactData_new);
+            }
           }
         }
         console.log('bulkContactToInsert Start...');
@@ -491,7 +518,7 @@ export class JobsService {
                   data: modifiedBatch,
                 }),
               );
-
+              cnt_inserted += modifiedBatch.length;
               for (const record of modifiedBatch) {
                 SuccessContactsData.push(record);
               }
@@ -563,7 +590,7 @@ export class JobsService {
                 }
                 //console.log('combinedQuery---', combinedQuery);
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
-
+                cnt_updated += batch.length;
                 console.log(
                   `Committed updates Contact for ${batch.length} records.`,
                 );
@@ -571,7 +598,7 @@ export class JobsService {
                 for (const record of batch) {
                   errorContactsData.push(batch);
                 }
-                console.error('Transaction error:', error);
+                console.error('Transaction error:', error.message);
                 errorString += error.message + '<br>';
                 throw error; // Handle or log the error as needed
               }
@@ -732,6 +759,12 @@ export class JobsService {
       OutputData[
         'success_url_act'
       ] = `${process.env.APP_URL}/jobs/${SuccessFileName_act}`;
+      OutputData['acnt_inserted'] = acnt_inserted;
+      OutputData['acnt_updated'] = acnt_updated;
+      OutputData['acnt_failed'] = errorAccountsData.length;
+      OutputData['cnt_inserted'] = cnt_inserted;
+      OutputData['cnt_updated'] = cnt_updated;
+      OutputData['cnt_failed'] = errorContactsData.length;
       //console.log('errorString--->', errorString);
 
       //  const flattenedData = [].concat.apply([], errorContactsData);
@@ -741,7 +774,7 @@ export class JobsService {
       //   errorAccountsData.length,
       // );
       const flattenedData = [].concat.apply([], errorAccountsData);
-      console.log('flattenedData', flattenedData, flattenedData.length);
+
       this.writeDataToCsv(errorAccountsData, fileName_Accounts);
       this.writeDataToCsv(errorContactsData, fileName_contacts);
 
@@ -757,7 +790,7 @@ export class JobsService {
         OutputValue: OutputData,
       };
     } catch (err) {
-      console.log('errorCode' + err);
+      console.log('errorCode' + err.message);
 
       const emailBody = {
         transactional_message_id: 96,
@@ -865,8 +898,12 @@ export class JobsService {
           },
           message_data: {
             total_records: status.TotalRecords,
-            inserted_records: status.created,
-            updated_records: status.updated,
+            acnt_inserted_records: status.OutputValue.acnt_inserted,
+            acnt_updated_records: status.OutputValue.acnt_updated,
+            acnt_failed_records: status.OutputValue.acnt_failed,
+            cnt_inserted_records: status.OutputValue.cnt_inserted,
+            cnt_updated_records: status.OutputValue.cnt_updated,
+            cnt_failed_records: status.OutputValue.cnt_updated,
             error_url_cnt: status.OutputValue.error_url_cnt,
             error_url_act: status.OutputValue.error_url_act,
             success_url_cnt: status.OutputValue.success_url_cnt,

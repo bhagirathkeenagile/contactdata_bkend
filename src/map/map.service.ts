@@ -323,7 +323,7 @@ export class MapService {
           disable_css_preprocessing: true,
         };
 
-        console.log('status.OutputValue----', status.OutputValue.error_url);
+       // console.log('status.OutputValue----', status.OutputValue.error_url);
 
         this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
           (await this.mailService.sendUserConfirmation(
