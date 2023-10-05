@@ -5,7 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn'],
+  });
   const configService: ConfigService = app.get(ConfigService);
   app.enableCors();
   await app.listen(configService.get<number>('PORT') || '5000');

@@ -43,6 +43,7 @@ export class ExcelController {
       }
 
       const data = await this.excelService.readExcelFile(file.path);
+
       const keyFromExcel = Object.keys(data[0]);
 
       const tableData = await fetchUploadInfo(targetTable);

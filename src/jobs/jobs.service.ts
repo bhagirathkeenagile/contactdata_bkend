@@ -96,19 +96,18 @@ export class JobsService {
 
       // console.log('accountsFields', accountsFields, contactsFields);
       const readExcelFile = await this.excelService.readExcelFile(map.filePath);
-      // console.log('readExcelFile', {
-      //   accountsFields,
-      //   contactsFields,
-      // });
 
       const totalRows = readExcelFile.length;
       let TotalRecords = 0;
       const contactsData_new = [];
       const accountsData_new = [];
       const accountsMap = new Map<string, any>();
+
       const contactsDatawithAccount = [];
+      const excelFileMap = new Map<string, any>();
+      const excelFileMapContacts = new Map<string, any>();
       await Promise.all(
-        readExcelFile.map(async (row) => {
+        readExcelFile.map(async (row, index) => {
           // check source table
           const accountsData = {};
           accountsFields.map((field) => {
@@ -122,6 +121,9 @@ export class JobsService {
                 cleanedcolumName.slice(1).trim()
             ] = row[field.excelHeader];
           });
+          accountsData['acnt_key'] = accountsData['Name'] + '_' + index;
+
+          excelFileMap.set(accountsData['Name'] + '_' + index, row);
 
           for (const key in accountsData) {
             if (accountsData.hasOwnProperty(key)) {
@@ -170,6 +172,24 @@ export class JobsService {
                 : true
               : row[field.excelHeader];
           });
+          excelFileMapContacts.set(
+            contactsData['FirstName'] +
+              '_' +
+              contactsData['LastName'] +
+              '_' +
+              contactsData['Email'] +
+              '_' +
+              index,
+            row,
+          );
+          contactsData['cnt_key'] =
+            contactsData['FirstName'] +
+            '_' +
+            contactsData['LastName'] +
+            '_' +
+            contactsData['Email'] +
+            '_' +
+            index;
 
           contactsFields.forEach((field) => {
             const cleanedColumnName = field.columnName.replace(
@@ -210,6 +230,7 @@ export class JobsService {
           // contactsData.push(contactsData,Name:accountsData['Name']);
 
           contactsDatawithAccount.push(contactsData);
+          // make excel map
 
           if (
             map.action === 'Update__1' ||
@@ -318,7 +339,6 @@ export class JobsService {
         });
 
         const result = Object.values(uniqueData);
-        console.log('result--', result);
 
         for (const accountData_new of result) {
           if (AllaccountsMap.get(accountData_new.Name)) {
@@ -337,29 +357,64 @@ export class JobsService {
         if (bulkAccountToInsert.length > 0) {
           for (let i = 0; i < bulkAccountToInsert.length; i += 50) {
             const batchToInsert = bulkAccountToInsert.slice(i, i + 50);
+            const batchToInsert_data = bulkAccountToInsert
+              .slice(i, i + 50)
+              .map(({ acnt_key, ...rest }) => rest);
+
             console.log('Insert Loop Start--', i);
             try {
               //console.log('batchToInsert--', batchToInsert);
               const InsertStatus = accountPromises.push(
                 await this.prisma.accounts.createMany({
-                  data: batchToInsert,
+                  data: batchToInsert_data,
                 }),
               );
-              for (const record of batchToInsert) {
-                SuccessAccountsData.push(record);
+              for (const record of batchToInsert_data) {
+                SuccessAccountsData.push(excelFileMap.get(record.acnt_key));
               }
               acnt_inserted += batchToInsert.length;
             } catch (err) {
-              acnt_failed += batchToInsert.length;
-              console.log('Account Error-', err.message);
+              acnt_failed += batchToInsert_data.length;
               errorString += err.message + '<br>';
+
               for (const record of batchToInsert) {
-                errorAccountsData.push(record);
+                const { acnt_key, ...rest } = record;
+                try {
+                  await this.prisma.accounts.create({
+                    data: rest,
+                  });
+                } catch (err) {
+                  const ErrorRow = excelFileMap.get(record.acnt_key);
+                  if (err instanceof Prisma.PrismaClientValidationError) {
+                    // Handle Prisma client validation error
+                    const startIndex = err.message.indexOf('})') + 2;
+                    const extractedMessage = err.message.substring(startIndex);
+                    const cleanedString = extractedMessage.replace(/\n/g, '');
+                    ErrorRow[
+                      'Error_message'
+                    ] = `Validation error: ${cleanedString}`;
+                  } else if (
+                    err instanceof Prisma.PrismaClientKnownRequestError
+                  ) {
+                    if (err.code === 'P2002') {
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Duplicate field value: ${err.meta.target}`;
+                    } else if (err.code === 'P2003') {
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Invalid input data: ${err.meta.target}`;
+                    } else {
+                      ErrorRow['Error_message'] = err.message;
+                    }
+                  }
+                  errorAccountsData.push(ErrorRow);
+                }
               }
             }
           }
         }
-        console.log('bulkAccountToInsert End');
+
         created = bulkAccountToInsert.length;
         updated = bulkAccountToUpdate.length;
         //  console.log('bulkAccountToUpdate Start...');
@@ -386,9 +441,10 @@ export class JobsService {
                 let ctr = 0;
                 console.log('COunt of Batch -', batch.length);
                 for (const record of batch) {
-                  const { id, ...updateFields } = record;
+                  const { id, ...updateFieldss } = record;
                   const idsToUpdate = batch.map((record) => record.id);
                   // console.log('Check-8', new Date());
+                  const { acnt_key, ...updateFields } = updateFieldss;
 
                   const updateFieldsString = Object.keys(updateFields)
                     .filter((key) => key !== 'id')
@@ -401,32 +457,10 @@ export class JobsService {
                       ${updateFieldsString}
                     WHERE id = ${id};
                   `;
-                  // const updateFieldsString = Object.keys(updateFields)
-                  //   .filter((key) => key !== 'id')
-                  //   .map((key) => {
-                  //     if (typeof updateFields[key] === 'string') {
-                  //       return `${key} = '${updateFields[key].replace(
-                  //         /'/g,
-                  //         "''",
-                  //       )}'`;
-                  //     } else {
-                  //       return `${key} = ${updateFields[key]}`;
-                  //     }
-                  //   })
-                  //   .join(', ');
-
-                  // const updateQuery = `
-                  //   UPDATE accounts
-                  //   SET
-                  //   ${updateFieldsString}
-                  //   WHERE id = ${id};
-                  //   `;
-
-                  //  console.log('Check-9', new Date());
 
                   combinedQuery += updateQuery + '\n';
 
-                  SuccessAccountsData.push(record);
+                  SuccessAccountsData.push(excelFileMap.get(record.acnt_key));
 
                   //  console.log('combinedQuery-', combinedQuery);
                 }
@@ -439,11 +473,54 @@ export class JobsService {
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
                 acnt_updated += batch.length;
                 console.log('Check-10', new Date());
-                console.log(`Committed updates for ${batch.length} records.`);
+                console.log(
+                  `Committed Accounts updates for ${batch.length} records.`,
+                );
               } catch (error) {
                 for (const record of batch) {
-                  errorAccountsData.push(record);
+                  const { id, acnt_key, ...updateFieldss } = record;
+                  //errorAccountsData.push(record);
+                  try {
+                    const updateErrorAccounts =
+                      await this.prisma.accounts.update({
+                        where: {
+                          id: id,
+                        },
+                        data: updateFieldss,
+                      });
+                  } catch (err) {
+                    const ErrorRow = excelFileMap.get(record.acnt_key);
+                    if (err instanceof Prisma.PrismaClientValidationError) {
+                      // Handle Prisma client validation error
+                      const startIndex = err.message.indexOf('})') + 2;
+                      const extractedMessage =
+                        err.message.substring(startIndex);
+                      const cleanedString = extractedMessage.replace(/\n/g, '');
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Validation error: ${cleanedString}`;
+                    } else if (
+                      err instanceof Prisma.PrismaClientKnownRequestError
+                    ) {
+                      if (err.code === 'P2002') {
+                        ErrorRow[
+                          'Error_message'
+                        ] = `Duplicate field value: ${err.meta.target}`;
+                      } else if (err.code === 'P2003') {
+                        ErrorRow[
+                          'Error_message'
+                        ] = `Invalid input data: ${err.meta.target}`;
+                      } else {
+                        ErrorRow['Error_message'] = err.message;
+                      }
+                    }
+                    errorAccountsData.push(ErrorRow);
+                  }
                 }
+
+                // const ErrorRow = excelFileMap.get(record.acnt_key);
+                //   errorAccountsData.push(ErrorRow);
+
                 console.error('Transaction error:', error);
                 errorString += error.message + '<br>';
 
@@ -460,6 +537,8 @@ export class JobsService {
           }
         }
         console.log('bulkAccountToUpdate End');
+        //  console.log('errorAccountsData-->', errorAccountsData);
+
         // console.log('errorAccountsData-->>', errorAccountsData);
 
         /** Contact Process start from here */
@@ -504,12 +583,15 @@ export class JobsService {
           const contactPromises = [];
           for (let i = 0; i < bulkContactToInsert.length; i += 50) {
             const batchToInsert = bulkContactToInsert.slice(i, i + 50);
+            const batchToInsert_data = bulkContactToInsert
+              .slice(i, i + 50)
+              .map(({ acnt_key, ...rest }) => rest);
             let modifiedBatch = [];
             try {
               //console.log('batchToInsert--', batchToInsert);
 
-              modifiedBatch = batchToInsert.map((item) => {
-                const { AccountName, ...rest } = item; // Destructure AccountName and get the rest of the object
+              modifiedBatch = batchToInsert_data.map((item) => {
+                const { AccountName, cnt_key, ...rest } = item; // Destructure AccountName and get the rest of the object
                 return rest; // Return the modified object without AccountName
               });
               //  console.log('modifiedBatch--', modifiedBatch);
@@ -518,19 +600,57 @@ export class JobsService {
                   data: modifiedBatch,
                 }),
               );
+              console.log('No of Contact Insrted-', modifiedBatch.length);
               cnt_inserted += modifiedBatch.length;
               for (const record of modifiedBatch) {
-                SuccessContactsData.push(record);
+                SuccessAccountsData.push(
+                  excelFileMapContacts.get(record.cnt_key),
+                );
               }
             } catch (err) {
-              console.log('ERRRRR-', err.message);
               errorString += err.message + '<br>';
-              for (const record of modifiedBatch) {
-                errorContactsData.push(record);
+              for (const record of batchToInsert) {
+                const { AccountName, cnt_key, ...rest } = record;
+                try {
+                  await this.prisma.contact.create({
+                    data: rest,
+                  });
+                  console.log('Single Record Insert-');
+                } catch (err) {
+                  cnt_failed++;
+                  const ErrorRow = excelFileMapContacts.get(record.cnt_key);
+                  if (err instanceof Prisma.PrismaClientValidationError) {
+                    // Handle Prisma client validation error
+                    const startIndex = err.message.indexOf('})') + 2;
+                    const extractedMessage = err.message.substring(startIndex);
+                    const cleanedString = extractedMessage.replace(/\n/g, '');
+                    ErrorRow[
+                      'Error_message'
+                    ] = `Validation error: ${cleanedString}`;
+                  } else if (
+                    err instanceof Prisma.PrismaClientKnownRequestError
+                  ) {
+                    if (err.code === 'P2002') {
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Duplicate field value: ${err.meta.target}`;
+                    } else if (err.code === 'P2003') {
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Invalid input data: ${err.meta.target}`;
+                    } else {
+                      ErrorRow['Error_message'] = err.message;
+                    }
+                  }
+                  errorAccountsData.push(ErrorRow);
+                  console.log('ERRRRR IN Single-', err.message);
+                }
               }
             }
           }
         }
+        // console.log('errorAccountsData--', errorAccountsData);
+
         console.log('bulkContactToUpdate Start...');
         console.log('bulkContactToUpdate Length-', bulkContactToUpdate.length);
         // update contacts start from here
@@ -555,9 +675,8 @@ export class JobsService {
                 let combinedQuery = '';
                 for (const record of batch) {
                   //  console.log('While-5');
-                  const { id, AccountName, ...updateFields } = record; // Destructure AccountName and get the rest of the object
+                  const { id, AccountName, cnt_key, ...updateFields } = record; // Destructure AccountName and get the rest of the object
                   const idsToUpdate = batch.map((record) => record.id);
-                  //  console.log('updateFields---', updateFields);
 
                   const updateFieldsString = Object.keys(updateFields)
                     .filter((key) => key !== 'id')
@@ -571,21 +690,9 @@ export class JobsService {
                     WHERE id = ${id};
                   `;
 
-                  // const updateFieldsString = Object.keys(updateFields)
-                  //   .filter((key) => key !== 'id')
-                  //   .map(
-                  //     (key) =>
-                  //       `${key} = '${updateFields[key].replace(/'/g, "''")}'`,
-                  //   )
-                  //   .join(', ');
-
-                  // const updateQuery = `
-                  // UPDATE Contact
-                  // SET
-                  // ${updateFieldsString}
-                  // WHERE id = ${id};
-                  // `;
-                  SuccessContactsData.push(record);
+                  SuccessAccountsData.push(
+                    excelFileMapContacts.get(record.cnt_key),
+                  );
                   combinedQuery += updateQuery + '\n';
                 }
                 //console.log('combinedQuery---', combinedQuery);
@@ -596,11 +703,50 @@ export class JobsService {
                 );
               } catch (error) {
                 for (const record of batch) {
-                  errorContactsData.push(batch);
+                  const { id, AccountName, cnt_key, ...updateCntFields } =
+                    record;
+                  try {
+                    await this.prisma.contact.update({
+                      where: {
+                        id: id,
+                      },
+                      data: updateCntFields,
+                    });
+                  } catch (err) {
+                    cnt_failed++;
+                    errorString += error.message + '<br>';
+                    const ErrorRow = excelFileMapContacts.get(record.cnt_key);
+                    if (err instanceof Prisma.PrismaClientValidationError) {
+                      // Handle Prisma client validation error
+                      const startIndex = err.message.indexOf('})') + 2;
+                      const extractedMessage =
+                        err.message.substring(startIndex);
+                      const cleanedString = extractedMessage.replace(/\n/g, '');
+                      ErrorRow[
+                        'Error_message'
+                      ] = `Validation error: ${cleanedString}`;
+                    } else if (
+                      err instanceof Prisma.PrismaClientKnownRequestError
+                    ) {
+                      if (err.code === 'P2002') {
+                        ErrorRow[
+                          'Error_message'
+                        ] = `Duplicate field value: ${err.meta.target}`;
+                      } else if (err.code === 'P2003') {
+                        ErrorRow[
+                          'Error_message'
+                        ] = `Invalid input data: ${err.meta.target}`;
+                      } else {
+                        ErrorRow['Error_message'] = err.message;
+                      }
+                    }
+                    errorAccountsData.push(ErrorRow);
+                  }
+
+                  //errorContactsData.push(batch);
                 }
                 console.error('Transaction error:', error.message);
                 errorString += error.message + '<br>';
-                throw error; // Handle or log the error as needed
               }
 
               startIndex += batchSize;
@@ -764,19 +910,17 @@ export class JobsService {
       OutputData['acnt_failed'] = errorAccountsData.length;
       OutputData['cnt_inserted'] = cnt_inserted;
       OutputData['cnt_updated'] = cnt_updated;
-      OutputData['cnt_failed'] = errorContactsData.length;
+      OutputData['cnt_failed'] = cnt_failed;
       //console.log('errorString--->', errorString);
 
       //  const flattenedData = [].concat.apply([], errorContactsData);
-      // console.log(
-      //   'errorAccountsData',
-      //   errorAccountsData,
-      //   errorAccountsData.length,
-      // );
+      console.log('errorAccountsData-->', errorAccountsData.length);
+
       const flattenedData = [].concat.apply([], errorAccountsData);
 
       this.writeDataToCsv(errorAccountsData, fileName_Accounts);
-      this.writeDataToCsv(errorContactsData, fileName_contacts);
+
+      //  this.writeDataToCsv(errorContactsData, fileName_contacts);
 
       this.writeDataToCsv(SuccessContactsData, SuccessFileName_cnt);
       this.writeDataToCsv(SuccessAccountsData, SuccessFileName_act);
@@ -828,19 +972,25 @@ export class JobsService {
 
   async writeDataToCsv(data: any[], filePath: string) {
     if (data.length > 0) {
-      // const header = Object.keys(data[0]);
-      // const csvWriter = createObjectCsvWriter({
-      //   path: filePath,
-      //   header: header,
-      // });
+      const rows = data.map((item) => {
+        return Object.values(item).map((value) => {
+          if (value === null || value === '') {
+            return '""'; // Replace with empty string
+          }
 
-      // await csvWriter.writeRecords(data);
+          if (typeof value === 'string' && value.includes(',')) {
+            return `"${value}"`;
+          }
 
-      const rows = data.map((item) => Object.values(item));
+          return value;
+        });
+      });
+
       const header = Object.keys(data[0]);
       const csvContent = `${header.join(',')}\n${rows
         .map((row) => row.join(','))
         .join('\n')}`;
+
       try {
         fs.writeFileSync(filePath, csvContent);
         console.log(`CSV file written to ${filePath}`);

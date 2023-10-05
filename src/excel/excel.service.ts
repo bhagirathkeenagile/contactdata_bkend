@@ -8,8 +8,12 @@ export class ExcelService {
 
   async readExcelFile(filePath: string): Promise<any[]> {
     const workbook = xlsx.readFile(filePath);
+
     const sheetName = workbook.SheetNames[0];
-    const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      defval: '',
+    });
+
     return sheetData;
   }
 

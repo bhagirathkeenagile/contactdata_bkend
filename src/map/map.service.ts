@@ -84,11 +84,11 @@ export class MapService {
     if (status.errorCode === 'NO_ERROR') {
       const emailBody = {
         transactional_message_id: 96,
-        to: 'bhagirathsingh@keenagile.com',
+        to: 'adam@availrecovery.com',
         from: 'support@itadusa.com',
         subject: 'Contact Import Summary',
         identifiers: {
-          email: 'bhagirathsingh@keenagile.com',
+          email: 'adam@availrecovery.com',
         },
         message_data: {
           total_records: status.TotalRecords,
@@ -323,7 +323,7 @@ export class MapService {
           disable_css_preprocessing: true,
         };
 
-       // console.log('status.OutputValue----', status.OutputValue.error_url);
+        // console.log('status.OutputValue----', status.OutputValue.error_url);
 
         this.configService.get<boolean>('SEND_EMAIL_AFTER_UPLOAD') &&
           (await this.mailService.sendUserConfirmation(
