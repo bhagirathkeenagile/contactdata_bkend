@@ -35,7 +35,7 @@ export class MapService {
     return fetchAllRules();
   }
 
-  async saveMappingData(data: CreateMapDto): Promise<{
+  async saveMappingData(data: any): Promise<{
     errorCode: 'ERROR' | 'NO_ERROR' | 'PROCESSING_FAILED';
   }> {
     const countExcelRows = (await this.readExcelFile(data.filePath)).length;
@@ -73,6 +73,7 @@ export class MapService {
       await this.jobsService.sendDataToJob({
         mapId: mappingData.id,
         status: 'PENDING',
+        email: data.email,
       });
       return { errorCode: 'NO_ERROR' };
     }
@@ -84,11 +85,11 @@ export class MapService {
     if (status.errorCode === 'NO_ERROR') {
       const emailBody = {
         transactional_message_id: 96,
-        to: 'adam@availrecovery.com',
+        to: 'bhagirathsingh@keenagile.com',
         from: 'support@itadusa.com',
         subject: 'Contact Import Summary',
         identifiers: {
-          email: 'adam@availrecovery.com',
+          email: 'bhagirathsingh@keenagile.com',
         },
         message_data: {
           total_records: status.TotalRecords,
@@ -135,8 +136,8 @@ export class MapService {
   async fetchContacts(page: number, pageSize: number) {
     const skip = (page - 1) * pageSize;
 
-    const contactdata = await this.prisma.contact.findMany({});
-    console.log('contact data ==>', contactdata);
+    //const contactdata = await this.prisma.contact.findMany({});
+    //console.log('contact data ==>', contactdata);
     const contacts = await this.prisma.contact.findMany({
       skip,
       take: Number(pageSize),
@@ -288,6 +289,7 @@ export class MapService {
         await this.jobsService.sendDataToJob({
           mapId: updatedMap.id,
           status: 'PENDING',
+          email: Data.email,
         });
         return { errorCode: 'NO_ERROR' };
       }
@@ -299,11 +301,11 @@ export class MapService {
       if (status.errorCode === 'NO_ERROR') {
         const emailBody = {
           transactional_message_id: 96,
-          to: 'bhagirathsingh@keenagile.com',
+          to: Data.email ? Data.email : 'bhagirathsingh@keenagile.com',
           from: 'support@itadusa.com',
           subject: 'Contact Import Summary',
           identifiers: {
-            email: 'bhagirathsingh@keenagile.com',
+            email: Data.email ? Data.email : 'bhagirathsingh@keenagile.com',
           },
           message_data: {
             total_records: status.TotalRecords,

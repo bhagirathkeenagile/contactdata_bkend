@@ -158,8 +158,10 @@ model Accounts {
   updated_at                          DateTime  @default(now()) @updatedAt
   deleted_at                          DateTime?
   Contact                             Contact[]
+
   //Searches                            Searches[]
   //Roles                               Roles[]
+  @@map("Accounts1")
 }
 
 model Contact {
@@ -299,6 +301,7 @@ model Contact {
   deleted_at                                 DateTime?
 
   @@unique([Email, LastName, FirstName], name: "contactIdentifier")
+  @@map("Contact1")
 }
 
 model MappingData {
@@ -321,6 +324,7 @@ model Jobs {
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
   isDeleted  Boolean  @default(false)
+  email      String?
 }
 
 model Searches {

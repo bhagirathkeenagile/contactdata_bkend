@@ -318,18 +318,8 @@ export class JobsService {
       if (map.action === 'Update' || map.action === 'Insert And Update') {
         console.log('Insert And Update Query Start Time', new Date());
 
-        const allAccounts = await this.prisma.accounts.findMany();
-
-        const AllaccountsMap = new Map<string, any>();
         const bulkAccountToInsert = [];
         const bulkAccountToUpdate = [];
-        const allAccountIds = [];
-        const accountPromises = [];
-        for (const account of allAccounts) {
-          AllaccountsMap.set(account.Name, account);
-          allAccountIds.push(account.id);
-        }
-
         const uniqueData = [];
 
         accountsData_new.forEach((item) => {
@@ -339,15 +329,81 @@ export class JobsService {
         });
 
         const result = Object.values(uniqueData);
+        console.log('result count ', result.length);
+        const AccountNameBatchSize = 20; // Set the batch size
+        const AllaccountsMap = new Map<string, any>();
+        for (let i = 0; i < result.length; i += AccountNameBatchSize) {
+          const batch = result.slice(i, i + AccountNameBatchSize);
+          const AccountNames = batch.map((account) => account.Name);
 
-        for (const accountData_new of result) {
-          if (AllaccountsMap.get(accountData_new.Name)) {
-            accountData_new['id'] = AllaccountsMap.get(accountData_new.Name).id;
-            bulkAccountToUpdate.push(accountData_new);
-          } else {
-            bulkAccountToInsert.push(accountData_new);
+          const allAccounts = await this.prisma.accounts.findMany({
+            select: {
+              id: true,
+              Name: true,
+            },
+            where: {
+              Name: {
+                in: AccountNames,
+              },
+            },
+          });
+
+          const accountLookup = {};
+
+          for (const account of allAccounts) {
+            accountLookup[account.Name] = account.id;
+            AllaccountsMap.set(account.Name, account);
+          }
+          console.log('Count of loop start from =', i);
+        }
+        for (let i = 0; i < result.length; i += AccountNameBatchSize) {
+          const batch = result.slice(i, i + AccountNameBatchSize);
+          const AccountNames = batch.map((account) => account.Name);
+          console.log('batch--', batch.length);
+          for (const account of batch) {
+            if (AllaccountsMap.get(account.Name)) {
+              account['id'] = AllaccountsMap.get(account.Name).id;
+              bulkAccountToUpdate.push(account);
+            } else {
+              bulkAccountToInsert.push(account);
+            }
           }
         }
+
+        // const allAccounts = await this.prisma.accounts.findMany({
+        //   select: {
+        //     id: true,
+        //     Name: true,
+        //   },
+        // });
+        // const AllaccountsMap = new Map<string, any>();
+        // const bulkAccountToInsert = [];
+        // const bulkAccountToUpdate = [];
+        // const allAccountIds = [];
+        const accountPromises = [];
+        // for (const account of allAccounts) {
+        //   AllaccountsMap.set(account.Name, account);
+        //   allAccountIds.push(account.id);
+        // }
+
+        // const uniqueData = [];
+
+        // accountsData_new.forEach((item) => {
+        //   if (!uniqueData[item.Name]) {
+        //     uniqueData[item.Name] = item;
+        //   }
+        // });
+
+        // const result = Object.values(uniqueData);
+
+        // for (const accountData_new of result) {
+        //   if (AllaccountsMap.get(accountData_new.Name)) {
+        //     accountData_new['id'] = AllaccountsMap.get(accountData_new.Name).id;
+        //     bulkAccountToUpdate.push(accountData_new);
+        //   } else {
+        //     bulkAccountToInsert.push(accountData_new);
+        //   }
+        // }
         console.log('bulkAccountToInsert Start...');
         console.log(
           'bulkAccountToInsert Length...',
@@ -369,12 +425,11 @@ export class JobsService {
                   data: batchToInsert_data,
                 }),
               );
-              for (const record of batchToInsert_data) {
+              for (const record of bulkAccountToInsert) {
                 SuccessAccountsData.push(excelFileMap.get(record.acnt_key));
               }
               acnt_inserted += batchToInsert.length;
             } catch (err) {
-              acnt_failed += batchToInsert_data.length;
               errorString += err.message + '<br>';
 
               for (const record of batchToInsert) {
@@ -383,6 +438,7 @@ export class JobsService {
                   await this.prisma.accounts.create({
                     data: rest,
                   });
+                  SuccessAccountsData.push(excelFileMap.get(record.acnt_key));
                 } catch (err) {
                   const ErrorRow = excelFileMap.get(record.acnt_key);
                   if (err instanceof Prisma.PrismaClientValidationError) {
@@ -408,6 +464,7 @@ export class JobsService {
                       ErrorRow['Error_message'] = err.message;
                     }
                   }
+                  acnt_failed++;
                   errorAccountsData.push(ErrorRow);
                 }
               }
@@ -543,22 +600,55 @@ export class JobsService {
 
         /** Contact Process start from here */
         console.log('Contact Process start...');
-        const allContacts = await this.prisma.contact.findMany();
-        const allNewAccounts = await this.prisma.accounts.findMany();
+
+        //const allNewAccounts = await this.prisma.accounts.findMany();
         const AllNewaccountsMap = new Map<string, any>();
-        for (const account of allNewAccounts) {
-          AllNewaccountsMap.set(account.Name, account);
+
+        for (let i = 0; i < result.length; i += AccountNameBatchSize) {
+          const batch = result.slice(i, i + AccountNameBatchSize);
+          const AccountNames = batch.map((account) => account.Name);
+
+          const allNewAccounts = await this.prisma.accounts.findMany({
+            select: {
+              id: true,
+              Name: true,
+            },
+            where: {
+              Name: {
+                in: AccountNames,
+              },
+            },
+          });
+
+          const accountLookup = {};
+
+          for (const account of allNewAccounts) {
+            AllNewaccountsMap.set(account.Name, account);
+          }
         }
 
         const AllcontactsMap = new Map<string, any>();
+        const allContactIds = [];
+        for (let i = 0; i < contactsData_new.length; i += 15) {
+          const batch = contactsData_new.slice(i, i + 15);
+          const emailAddresses = batch.map((contact) => contact.Email);
+
+          const allContacts = await this.prisma.contact.findMany({
+            where: {
+              Email: {
+                in: emailAddresses,
+              },
+            },
+          });
+          for (const contact of allContacts) {
+            AllcontactsMap.set(contact.Email, contact);
+            allContactIds.push(contact.id);
+          }
+        }
+
         const bulkContactToInsert = [];
         const bulkContactToUpdate = [];
-        const allContactIds = [];
 
-        for (const contact of allContacts) {
-          AllcontactsMap.set(contact.Email, contact);
-          allContactIds.push(contact.id);
-        }
         console.log('contactsData_new Length-', contactsData_new.length);
         for (const contactData_new of contactsData_new) {
           if (AllNewaccountsMap.get(contactData_new.AccountName)) {
@@ -574,6 +664,11 @@ export class JobsService {
             } else {
               bulkContactToInsert.push(contactData_new);
             }
+          } else {
+            const errorData = excelFileMapContacts.get(contactData_new.cnt_key);
+            errorData['Error_message'] =
+              'Account not Inserted, there may be some issue with account';
+            errorAccountsData.push(errorData);
           }
         }
         console.log('bulkContactToInsert Start...');
@@ -615,6 +710,11 @@ export class JobsService {
                   await this.prisma.contact.create({
                     data: rest,
                   });
+
+                  SuccessAccountsData.push(
+                    excelFileMapContacts.get(record.cnt_key),
+                  );
+
                   console.log('Single Record Insert-');
                 } catch (err) {
                   cnt_failed++;
@@ -643,7 +743,7 @@ export class JobsService {
                     }
                   }
                   errorAccountsData.push(ErrorRow);
-                  console.log('ERRRRR IN Single-', err.message);
+                  console.log('ERRRRR IN Single-', rest, err.message);
                 }
               }
             }
@@ -689,13 +789,19 @@ export class JobsService {
                       ${updateFieldsString}
                     WHERE id = ${id};
                   `;
-
-                  SuccessAccountsData.push(
-                    excelFileMapContacts.get(record.cnt_key),
+                  const exists = SuccessAccountsData.some(
+                    (contact) =>
+                      contact.AccountName === record.AccountName &&
+                      contact.Email === record.Email,
                   );
+                  if (!exists) {
+                    SuccessAccountsData.push(
+                      excelFileMapContacts.get(record.cnt_key),
+                    );
+                  }
                   combinedQuery += updateQuery + '\n';
                 }
-                //console.log('combinedQuery---', combinedQuery);
+                //  console.log('combinedQuery---', combinedQuery);
                 const result = await this.prisma.$queryRawUnsafe(combinedQuery);
                 cnt_updated += batch.length;
                 console.log(
@@ -712,7 +818,18 @@ export class JobsService {
                       },
                       data: updateCntFields,
                     });
+                    const exists = SuccessAccountsData.some(
+                      (contact) =>
+                        contact.AccountName === record.AccountName &&
+                        contact.Email === record.Email,
+                    );
+                    if (!exists) {
+                      SuccessAccountsData.push(
+                        excelFileMapContacts.get(record.cnt_key),
+                      );
+                    }
                   } catch (err) {
+                    console.log('err-', err.message);
                     cnt_failed++;
                     errorString += error.message + '<br>';
                     const ErrorRow = excelFileMapContacts.get(record.cnt_key);
@@ -820,7 +937,12 @@ export class JobsService {
         /**
          * make map of aCCOUNT id with Name
          */
-        const allAccounts = await this.prisma.accounts.findMany();
+        const allAccounts = await this.prisma.accounts.findMany({
+          select: {
+            id: true,
+            Name: true,
+          },
+        });
         const AllaccountsMap = new Map<string, any>();
         for (const account of allAccounts) {
           AllaccountsMap.set(account.Name, account.id);
@@ -907,7 +1029,7 @@ export class JobsService {
       ] = `${process.env.APP_URL}/jobs/${SuccessFileName_act}`;
       OutputData['acnt_inserted'] = acnt_inserted;
       OutputData['acnt_updated'] = acnt_updated;
-      OutputData['acnt_failed'] = errorAccountsData.length;
+      OutputData['acnt_failed'] = acnt_failed;
       OutputData['cnt_inserted'] = cnt_inserted;
       OutputData['cnt_updated'] = cnt_updated;
       OutputData['cnt_failed'] = cnt_failed;
@@ -916,14 +1038,37 @@ export class JobsService {
       //  const flattenedData = [].concat.apply([], errorContactsData);
       console.log('errorAccountsData-->', errorAccountsData.length);
 
-      const flattenedData = [].concat.apply([], errorAccountsData);
+      if (errorAccountsData.length > 0) {
+        const flattenedData = [].concat.apply([], errorAccountsData);
+        this.writeDataToCsv(errorAccountsData, fileName_Accounts);
+      }
 
-      this.writeDataToCsv(errorAccountsData, fileName_Accounts);
+      const inputArray = [
+        /* Your array of objects here */
+      ]; // Your provided data
 
-      //  this.writeDataToCsv(errorContactsData, fileName_contacts);
+      const uniqueArray = [];
+      const usedKeys = new Map();
+      let filteredArray = [];
+      // console.log('SuccessAccountsData---', SuccessAccountsData);
+      if (SuccessAccountsData.length > 0) {
+        for (const item of SuccessAccountsData) {
+          if (item !== undefined) {
+            const firstIndexValue = item[Object.keys(item)[0]]; // Get the value of the first index
 
-      this.writeDataToCsv(SuccessContactsData, SuccessFileName_cnt);
-      this.writeDataToCsv(SuccessAccountsData, SuccessFileName_act);
+            if (!usedKeys.has(firstIndexValue)) {
+              usedKeys.set(firstIndexValue, true); // Mark this key as used
+              uniqueArray.push(item);
+            }
+          }
+        }
+      }
+
+      filteredArray = uniqueArray.filter(
+        (item) => !item.hasOwnProperty('Error_message'),
+      );
+
+      this.writeDataToCsv(filteredArray, SuccessFileName_act);
 
       return {
         errorCode: 'NO_ERROR',
@@ -949,7 +1094,7 @@ export class JobsService {
           inserted_records: 0,
           updated_records: 0,
           exist_records: '100',
-          header_content: `Import process has been failed, and we found this error: ${err.message}`,
+          header_content: `Import process has been failed, and we found this error: ${err.lineNumber}: ${err.message}`,
         },
       };
 
@@ -993,7 +1138,6 @@ export class JobsService {
 
       try {
         fs.writeFileSync(filePath, csvContent);
-        console.log(`CSV file written to ${filePath}`);
       } catch (error) {
         console.error(`Error writing CSV file: ${error}`);
       }
@@ -1040,11 +1184,11 @@ export class JobsService {
       if (status.errorCode === 'NO_ERROR') {
         const emailBody = {
           transactional_message_id: 96,
-          to: 'bhagirathsingh@keenagile.com',
+          to: job.email ? job.email : 'bhagirathsingh@keenagile.com',
           from: 'support@itadusa.com',
           subject: 'Contact Import Summary from Backend Process',
           identifiers: {
-            email: 'bhagirathsingh@keenagile.com',
+            email: job.email ? job.email : 'bhagirathsingh@keenagile.com',
           },
           message_data: {
             total_records: status.TotalRecords,
@@ -1423,7 +1567,9 @@ export class JobsService {
     filter: string,
   ): Promise<any> {
     const filterval = JSON.parse(filter);
+    console.log('filterval--', filterval);
     const employeePercentage = employeePercentageRequest / 100;
+    const PAGE_SIZE = 100;
     const allContacts = await this.prisma.contact.findMany({
       where: {
         ...filterval,
@@ -1450,6 +1596,8 @@ export class JobsService {
           FirstName: 'asc',
         },
       ],
+      take: PAGE_SIZE, // Set the page size
+      skip: 1 * PAGE_SIZE, // Adjust according to the current page
     });
     console.log('allContacts :>> ', filter);
     let allContactsData = {};

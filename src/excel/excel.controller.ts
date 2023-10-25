@@ -43,13 +43,18 @@ export class ExcelController {
       }
 
       const data = await this.excelService.readExcelFile(file.path);
-
+      console.log('Excel Rows-', data.length);
       const keyFromExcel = Object.keys(data[0]);
 
       const tableData = await fetchUploadInfo(targetTable);
       return res
         .status(200)
-        .json({ keyFromExcel, tableData, filePath: file.path });
+        .json({
+          keyFromExcel,
+          tableData,
+          filePath: file.path,
+          excelLength: data.length,
+        });
     } catch (error) {
       if (error instanceof BadRequestException) {
         return res.status(400).json({ error: error.message });
