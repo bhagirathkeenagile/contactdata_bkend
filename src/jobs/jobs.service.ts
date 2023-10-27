@@ -1566,10 +1566,9 @@ export class JobsService {
     minimumCount: number,
     filter: string,
   ): Promise<any> {
+    console.log('test 1111', filter);
     const filterval = JSON.parse(filter);
-    console.log('filterval--', filterval);
     const employeePercentage = employeePercentageRequest / 100;
-    const PAGE_SIZE = 100;
     const allContacts = await this.prisma.contact.findMany({
       where: {
         ...filterval,
@@ -1581,12 +1580,12 @@ export class JobsService {
         Email: true,
         Title: true,
         RingLead_Score__c: true,
-        Account: {
-          select: {
-            Name: true,
-            NumberOfEmployees: true,
-          },
-        },
+        // Account: {
+        //   select: {
+        //     Name: true,
+        //     NumberOfEmployees: true,
+        //   },
+        // },
       },
       orderBy: [
         {
@@ -1596,19 +1595,30 @@ export class JobsService {
           FirstName: 'asc',
         },
       ],
-      take: PAGE_SIZE, // Set the page size
-      skip: 1 * PAGE_SIZE, // Adjust according to the current page
     });
     console.log('allContacts :>> ', filter);
+    // const Allaccountids =[];
+    // allContacts.map((contact) => {
+    //   Allaccountids.push(contact.AccountId)
+    // })
+    // const uniqueAccountid = [...new Set(Allaccountids)];
+    const allAccount = await this.prisma.accounts.findMany({
+      select: {
+        id: true,
+        Name: true,
+        NumberOfEmployees: true,
+      },
+    });
+    console.log('test22222');
     let allContactsData = {};
     allContacts.map((contact) => {
-      if (allContactsData[contact.Account.Name]) {
+      if (allContactsData[contact.AccountId]) {
         contact['is_included'] = 'Excluded';
-        allContactsData[contact.Account.Name]['contacts'].push(contact);
+        allContactsData[contact.AccountId]['contacts'].push(contact);
       } else {
         contact['is_included'] = 'Excluded';
-        allContactsData[contact.Account.Name] = {
-          name: contact.Account.Name,
+        allContactsData[contact.AccountId] = {
+          name: contact.AccountId,
           contacts: [contact],
         };
       }
@@ -1616,7 +1626,9 @@ export class JobsService {
     for (const accountName in allContactsData) {
       const account = allContactsData[accountName];
       account.contacts.forEach((contact, index) => {
-        let assa = contact.Account.NumberOfEmployees * employeePercentage;
+        let assa =
+          allAccount.find((account) => account.id === contact.AccountId)
+            .NumberOfEmployees * employeePercentage;
         let calculated = assa < 1 ? 1 : assa > 3 ? 3 : Math.ceil(assa);
         contact.sequence = Math.ceil((index + 1) / calculated);
       });
@@ -1647,7 +1659,9 @@ export class JobsService {
     return await this.excelService.writeExcelFile(
       contactsArray.map((item) => {
         return {
-          'Account Name': item.Account.Name,
+          'Account Name': allAccount.find(
+            (account) => account.id === item.AccountId,
+          ).Name,
           'First Name': item.FirstName,
           'Last Name': item.LastName,
           Email: item.Email,

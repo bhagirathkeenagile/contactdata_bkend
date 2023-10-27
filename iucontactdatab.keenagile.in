@@ -1,0 +1,47 @@
+server {
+    listen 80;
+    server_name iucontactdatab.keenagile.in www.iucontactdatab.keenagile.in;
+
+    location / {
+        proxy_pass http://localhost:5002;  # Replace with your NestJS app's port
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Additional NGINX configurations can be added here, such as SSL settings.
+}
+server {
+
+    listen 443 ssl;
+
+    root /var/www/contactdata_bknd;
+
+    index index.html index.htm;
+
+    server_name www.dashboard.example.com;
+
+    # ssl configuration;
+
+    ssl_certificate /etc/letsencrypt/live/iucontactdatab.keenagile.in/fullchain.pem;
+
+    ssl_certificate_key /etc/letsencrypt/live/iucontactdatab.keenagile.in/privkey.pem;
+
+    return 301 https:/iucontactdatab.keenagile.in$request_uri;
+
+}
+
+server {
+
+    listen 443 ssl;
+
+    root /var/www/contactdata_bknd;
+
+    index index.html index.htm;
+
+    # ssl configuration;
+
+    ssl_certificate /etc/letsencrypt/live/iucontactdatab.keenagile.in/fullchain.pem;
+
+    ssl_certificate_key /etc/letsencrypt/live/iucontactdatab.keenagile.in/privkey.pem;
+
+}
