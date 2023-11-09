@@ -74,6 +74,7 @@ export class MapService {
         mapId: mappingData.id,
         status: 'PENDING',
         email: data.email,
+        jobType: null,
       });
       return { errorCode: 'NO_ERROR' };
     }
@@ -132,22 +133,29 @@ export class MapService {
     });
     return { mapData: mapData };
   }
-
   async fetchContacts(page: number, pageSize: number) {
     const skip = (page - 1) * pageSize;
 
-    //const contactdata = await this.prisma.contact.findMany({});
-    //console.log('contact data ==>', contactdata);
+    // const contactdata = await this.prisma.contact.findMany({});
+    //  console.log('contact data ==>', contactdata);
     const contacts = await this.prisma.contact.findMany({
       skip,
       take: Number(pageSize),
       include: {
         Account: true,
       },
+      orderBy: [
+        {
+          RingLead_Score__c: 'desc',
+        },
+        {
+          FirstName: 'asc',
+        },
+      ],
     });
 
     const totalContacts = await this.prisma.contact.count();
-
+    // const totalContacts =1000000;
     return {
       contacts: JSON.parse(
         JSON.stringify(contacts, (key, value) =>
@@ -290,14 +298,16 @@ export class MapService {
           mapId: updatedMap.id,
           status: 'PENDING',
           email: Data.email,
+          jobType: null,
         });
+        console.log('Data from JOb');
         return { errorCode: 'NO_ERROR' };
       }
       // process contact rows immediately
       const status = await this.jobsService.ProcessContactRowsImmediately(
         updatedMap.id,
       );
-
+      console.log('Data from Immed');
       if (status.errorCode === 'NO_ERROR') {
         const emailBody = {
           transactional_message_id: 96,
@@ -340,5 +350,56 @@ export class MapService {
       console.log(error);
       return { message: 'Facing Problem To Update Data', error: error.message };
     }
+  }
+
+  async fetctfiltercontactData(
+    filterval: string,
+    page: number,
+    pageSize: number,
+  ) {
+    const skip = (page - 1) * pageSize;
+    console.log('test 183');
+    const filterval1 = JSON.parse(filterval);
+    console.log('filter 175 service', filterval);
+    const allContacts = await this.prisma.contact.findMany({
+      where: {
+        ...filterval1,
+      },
+      skip,
+      take: Number(pageSize),
+      include: {
+        Account: true,
+      },
+      orderBy: [
+        {
+          RingLead_Score__c: 'desc',
+        },
+        {
+          FirstName: 'asc',
+        },
+      ],
+    });
+    console.log('records');
+    const totalContacts = await this.prisma.contact.count({
+      where: {
+        ...filterval1,
+      },
+      orderBy: [
+        {
+          RingLead_Score__c: 'desc',
+        },
+        {
+          FirstName: 'asc',
+        },
+      ],
+    });
+    return await {
+      contacts: JSON.parse(
+        JSON.stringify(allContacts, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value,
+        ),
+      ),
+      totalContacts,
+    };
   }
 }

@@ -97,6 +97,30 @@ export class MapController {
     }
   }
 
+  @Post('list-contactData-filter')
+  async filterlistContactData(
+    @Body() requestData: any,
+    @Query('page') page: number,
+    @Query('pageSize') pageSize: number,
+  ): Promise<any> {
+    try {
+      const { filterval, filterseconf } = requestData;
+      console.log('filterval', filterval, filterseconf, page, pageSize);
+      const data = await this.mapService.fetctfiltercontactData(
+        filterval,
+        page,
+        pageSize,
+      );
+      console.log('data');
+      return data;
+    } catch (error) {
+      return {
+        errorCode: 'ERROR',
+        message: error.message,
+      };
+    }
+  }
+
   @Get('list-contactData')
   async listContactData() {
     try {
